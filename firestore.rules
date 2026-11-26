@@ -189,7 +189,7 @@ service cloud.firestore {
         isValidId(data.customerUid) &&
         data.customerName is string && data.customerName.size() >= 2 && data.customerName.size() <= 120 &&
         data.customerEmail is string && data.customerEmail.size() >= 5 && data.customerEmail.size() <= 200 &&
-        data.customerWhatsapp is string && data.customerWhatsapp.size() >= 9 && data.customerWhatsapp.size() <= 25 &&
+        data.customerWhatsapp is string && (data.customerWhatsapp.size() == 0 || (data.customerWhatsapp.size() >= 9 && data.customerWhatsapp.size() <= 25)) &&
         isValidId(data.serviceId) &&
         data.serviceTitle is string && data.serviceTitle.size() >= 3 && data.serviceTitle.size() <= 140 &&
         data.estimatedPriceLabel is string && data.estimatedPriceLabel.size() >= 3 && data.estimatedPriceLabel.size() <= 100 &&

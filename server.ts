@@ -80,7 +80,7 @@ async function startServer() {
       res.status(400).json({ error: 'Validasi gagal: ID layanan tidak valid.' });
       return;
     }
-    if (!isValidWhatsappNumber(whatsapp)) {
+    if (whatsapp.length > 0 && !isValidWhatsappNumber(whatsapp)) {
       res.status(400).json({ error: 'Validasi gagal: format nomor WhatsApp tidak valid.' });
       return;
     }

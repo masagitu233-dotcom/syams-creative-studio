@@ -2,17 +2,17 @@ import { Link } from 'react-router-dom';
 import { ArrowUpRight } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { buildWhatsappLink, sanitizeExternalUrl } from '../utils/studioLogic';
+import { buildWhatsappLink, sanitizeHttpUrl } from '../utils/studioLogic';
 
 export function Footer() {
   const { siteSettings } = useStudioData();
   const { user, isAdmin } = useAuth();
 
   const socialLinks = [
-    { label: 'Instagram', url: sanitizeExternalUrl(siteSettings.instagramUrl) },
-    { label: 'TikTok', url: sanitizeExternalUrl(siteSettings.tiktokUrl) },
-    { label: 'YouTube', url: sanitizeExternalUrl(siteSettings.youtubeUrl) },
-    { label: 'LinkedIn', url: sanitizeExternalUrl(siteSettings.linkedinUrl) },
+    { label: 'Instagram', url: sanitizeHttpUrl(siteSettings.instagramUrl) },
+    { label: 'TikTok', url: sanitizeHttpUrl(siteSettings.tiktokUrl) },
+    { label: 'YouTube', url: sanitizeHttpUrl(siteSettings.youtubeUrl) },
+    { label: 'LinkedIn', url: sanitizeHttpUrl(siteSettings.linkedinUrl) },
   ].filter((item) => Boolean(item.url));
 
   const waHref = buildWhatsappLink(

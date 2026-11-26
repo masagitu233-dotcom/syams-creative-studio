@@ -54,7 +54,7 @@ export async function handler(event: NetlifyEvent): Promise<NetlifyResponse> {
       body: JSON.stringify({ error: 'Validasi gagal: ID layanan tidak valid.' }),
     };
   }
-  if (!isValidWhatsappNumber(whatsapp)) {
+  if (whatsapp.length > 0 && !isValidWhatsappNumber(whatsapp)) {
     return {
       statusCode: 400,
       headers: { 'Content-Type': 'application/json' },

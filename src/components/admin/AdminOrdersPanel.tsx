@@ -10,6 +10,7 @@ import {
   filterAndSortOrders,
   formatDateTimeId,
   formatRupiah,
+  isValidWhatsappNumber,
   ORDER_STATUS_META,
 } from '../../utils/studioLogic';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -244,18 +245,22 @@ export function AdminOrdersPanel({ orders, actor, onRefresh, onToast }: AdminOrd
                       <td className="px-3.5 py-2.5 align-top">
                         <p className="font-semibold text-[#171717]">{order.customerName}</p>
                         <p className="text-[11px] text-[#525252]">{order.customerEmail}</p>
-                        <a
-                          href={buildWhatsappLink(
-                            order.customerWhatsapp,
-                            `Halo ${order.customerName}, terkait pesanan ${order.orderCode} (${order.projectTitle}) di SYAMS CREATIVE STUDIO...`
-                          )}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-mono text-[#0F3D3A] underline mt-0.5"
-                        >
-                          +{order.customerWhatsapp}
-                          <ArrowUpRight className="w-3 h-3" />
-                        </a>
+                        {order.customerWhatsapp && isValidWhatsappNumber(order.customerWhatsapp) ? (
+                          <a
+                            href={buildWhatsappLink(
+                              order.customerWhatsapp,
+                              `Halo ${order.customerName}, terkait pesanan ${order.orderCode} (${order.projectTitle}) di SYAMS CREATIVE STUDIO...`
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-mono text-[#0F3D3A] underline mt-0.5"
+                          >
+                            +{order.customerWhatsapp}
+                            <ArrowUpRight className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <p className="text-[11px] text-[#737373] mt-0.5">WhatsApp tidak diisi</p>
+                        )}
                       </td>
                       <td className="px-3.5 py-2.5 align-top max-w-xs">
                         <p className="font-semibold text-[#171717]">{order.projectTitle}</p>
@@ -358,7 +363,27 @@ export function AdminOrdersPanel({ orders, actor, onRefresh, onToast }: AdminOrd
                 Konfirmasi Harga & Status Pesanan
               </h3>
               <p className="text-xs text-[#525252]">
-                {editingOrder.customerName} · {editingOrder.serviceTitle}
+                {editingOrder.customerName} ({editingOrder.customerEmail}) ·{' '}
+                {editingOrder.serviceTitle}
+              </p>
+              <p className="text-[11px] text-[#525252]">
+                WhatsApp Pembeli:{' '}
+                {editingOrder.customerWhatsapp &&
+                isValidWhatsappNumber(editingOrder.customerWhatsapp) ? (
+                  <a
+                    href={buildWhatsappLink(
+                      editingOrder.customerWhatsapp,
+                      `Halo ${editingOrder.customerName}, terkait pesanan ${editingOrder.orderCode} (${editingOrder.projectTitle}) di SYAMS CREATIVE STUDIO...`
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-[#0F3D3A] underline"
+                  >
+                    +{editingOrder.customerWhatsapp}
+                  </a>
+                ) : (
+                  <span className="text-[#737373]">Tidak diisi</span>
+                )}
               </p>
             </div>
 

@@ -9,7 +9,8 @@ import { formatUserFriendlyError } from '../lib/firestoreErrors';
 import { VISUAL_THEME_OPTIONS } from '../utils/studioLogic';
 
 export function ThemePreviewBanner() {
-  const { isPreviewActive, previewTheme, persistedTheme, stopPreview } = useTheme();
+  const { isPreviewActive, previewTheme, persistedTheme, stopPreview, syncCachedTheme } =
+    useTheme();
   const { user, isAdmin } = useAuth();
   const { pushToast } = useStudioData();
   const location = useLocation();
@@ -25,10 +26,11 @@ export function ThemePreviewBanner() {
     if (!user || !isAdmin || !previewTheme) return;
     setApplying(true);
     try {
-      await saveVisualThemeByAdmin(previewTheme, {
+      const saved = await saveVisualThemeByAdmin(previewTheme, {
         uid: user.uid,
         email: user.email || '',
       });
+      syncCachedTheme(saved);
       stopPreview();
       pushToast({
         type: 'success',

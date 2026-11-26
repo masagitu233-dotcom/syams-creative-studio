@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
@@ -76,11 +76,14 @@ export function CheckoutPage() {
     }
   }, [services, initialServiceSlug, selectedServiceId]);
 
+  const hasPrefilledWhatsappRef = useRef(false);
+
   useEffect(() => {
-    if (customerProfile?.whatsapp && !whatsapp) {
+    if (!hasPrefilledWhatsappRef.current && customerProfile?.whatsapp) {
       setWhatsapp(customerProfile.whatsapp);
+      hasPrefilledWhatsappRef.current = true;
     }
-  }, [customerProfile, whatsapp]);
+  }, [customerProfile]);
 
   useEffect(() => {
     void fetchDriveIntegrationStatus().then(setDriveStatus);
@@ -395,19 +398,20 @@ export function CheckoutPage() {
 
                     <div className="space-y-1">
                       <label htmlFor="checkout-whatsapp" className="block text-xs font-semibold">
-                        Nomor WhatsApp Aktif <span className="text-[#6C151E]">*</span>
+                        Nomor WhatsApp Aktif{' '}
+                        <span className="font-normal text-[#525252]">(Opsional)</span>
                       </label>
                       <input
                         id="checkout-whatsapp"
                         type="tel"
                         value={whatsapp}
                         onChange={(e) => setWhatsapp(e.target.value)}
-                        placeholder="Contoh: 081234567890"
+                        placeholder="Contoh: 081234567890 (boleh dikosongkan)"
                         className="nb-input"
-                        required
                       />
                       <p className="text-[11px] text-[#525252]">
-                        Digunakan admin untuk mengonfirmasi rincian pekerjaan dan biaya final.
+                        Opsional — jika diisi, admin dapat menghubungi Anda lebih cepat via
+                        WhatsApp untuk konfirmasi brief dan biaya final.
                       </p>
                       {errors.customerWhatsapp && (
                         <p className="text-xs font-medium text-[#6C151E]">

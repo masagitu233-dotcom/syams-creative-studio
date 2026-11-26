@@ -345,6 +345,13 @@
   }
 }
 
+/* Theme-neutral canvas while initial Firestore visualTheme resolves on cold visit */
+html[data-theme-pending="true"],
+html[data-theme-pending="true"] body {
+  background-color: #F6F6F2;
+  color: #171717;
+}
+
 /* ============================================================================
    Clean Bento Grid Visual Theme (Presentation Layer Only)
    Strictly scoped to html[data-theme="clean_bento"].

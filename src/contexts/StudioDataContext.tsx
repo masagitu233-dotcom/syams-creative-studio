@@ -32,6 +32,7 @@ interface StudioDataContextValue {
   loadingProducts: boolean;
   loadingPortfolio: boolean;
   loadingFaqs: boolean;
+  loadingSettings: boolean;
   isCatalogSyncedToFirestore: boolean;
   isProductsSyncedToFirestore: boolean;
   dataError: string | null;
@@ -53,10 +54,21 @@ export function StudioDataProvider({ children }: { children: React.ReactNode }) 
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
   const [loadingFaqs, setLoadingFaqs] = useState(true);
+  const [loadingSettings, setLoadingSettings] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastNotice[]>([]);
 
   useEffect(() => {
+    let settingsSettled = false;
+    const settleSettings = () => {
+      if (!settingsSettled) {
+        settingsSettled = true;
+        setLoadingSettings(false);
+      }
+    };
+    // Resilience fallback so visitors are never blocked if Firestore is unreachable/offline
+    const settingsTimeout = window.setTimeout(settleSettings, 3500);
+
     const unsubServices = subscribePublicServices(
       (items) => {
         setLiveServices(items);
@@ -101,13 +113,16 @@ export function StudioDataProvider({ children }: { children: React.ReactNode }) 
     const unsubSettings = subscribeSiteSettings(
       (settings) => {
         setLiveSettings(settings);
+        settleSettings();
       },
       () => {
         // Fallback to initial settings silently
+        settleSettings();
       }
     );
 
     return () => {
+      window.clearTimeout(settingsTimeout);
       unsubServices();
       unsubProducts();
       unsubPortfolio();
@@ -157,6 +172,7 @@ export function StudioDataProvider({ children }: { children: React.ReactNode }) 
         loadingProducts,
         loadingPortfolio,
         loadingFaqs,
+        loadingSettings,
         isCatalogSyncedToFirestore: isServicesLive,
         isProductsSyncedToFirestore: isProductsLive,
         dataError,

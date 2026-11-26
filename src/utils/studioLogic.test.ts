@@ -19,16 +19,23 @@ import {
   normalizeVisualTheme,
   normalizeWhatsappNumber,
   promoteGalleryItemToPrimary,
+  readCachedVisualTheme,
   reorderGalleryItems,
   resolveEffectiveVisualTheme,
+  resolveInitialThemeState,
   sanitizeExternalUrl,
+  sanitizeHttpUrl,
+  THEME_CACHE_STORAGE_KEY,
   validateContactInput,
   validateDigitalProductInput,
   validateMediaFileBeforeUpload,
+  validateOptionalSocialUrls,
   validateOrderInput,
   validateServiceInput,
   VISUAL_THEME_OPTIONS,
+  writeCachedVisualTheme,
 } from './studioLogic';
+import { handler as createOrderHandler } from '../../netlify/functions/create-order';
 import type { DigitalProductItem, OrderItem } from '../types/studio';
 
 test('formatRupiah and formatServicePriceLabel format Indonesian Rupiah accurately', () => {
@@ -501,6 +508,151 @@ test('visual theme helpers validate enum, default to neo_brutalist, and prioriti
   assert.equal(resolveEffectiveVisualTheme('clean_bento', null), 'clean_bento');
   assert.equal(resolveEffectiveVisualTheme('neo_brutalist', 'clean_bento'), 'clean_bento');
   assert.equal(resolveEffectiveVisualTheme('clean_bento', 'neo_brutalist'), 'neo_brutalist');
+});
+
+test('theme cache and initial resolution prevent theme flash on both cached and uncached visits', () => {
+  const store = new Map<string, string>();
+  const mockStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      store.set(k, v);
+    },
+  };
+
+  // Uncached cold visit: hold rendering (themeReady = false) until Firestore resolves
+  assert.equal(readCachedVisualTheme(mockStorage), null);
+  const coldLoading = resolveInitialThemeState({
+    cachedTheme: null,
+    firestoreTheme: undefined,
+    loadingSettings: true,
+    previewTheme: null,
+  });
+  assert.equal(coldLoading.themeReady, false);
+
+  // Cold visit once Firestore resolves to clean_bento: render directly in clean_bento
+  const coldResolved = resolveInitialThemeState({
+    cachedTheme: null,
+    firestoreTheme: 'clean_bento',
+    loadingSettings: false,
+    previewTheme: null,
+  });
+  assert.equal(coldResolved.themeReady, true);
+  assert.equal(coldResolved.activeTheme, 'clean_bento');
+  assert.equal(coldResolved.persistedTheme, 'clean_bento');
+
+  // Persist to cache and verify instant hydration on subsequent load before Firestore returns
+  writeCachedVisualTheme('clean_bento', mockStorage);
+  assert.equal(store.get(THEME_CACHE_STORAGE_KEY), 'clean_bento');
+  assert.equal(readCachedVisualTheme(mockStorage), 'clean_bento');
+
+  const warmLoading = resolveInitialThemeState({
+    cachedTheme: readCachedVisualTheme(mockStorage),
+    firestoreTheme: undefined,
+    loadingSettings: true,
+    previewTheme: null,
+  });
+  assert.equal(warmLoading.themeReady, true);
+  assert.equal(warmLoading.activeTheme, 'clean_bento');
+
+  // Firestore remains authoritative if Admin later switches theme back to neo_brutalist
+  const firestoreOverride = resolveInitialThemeState({
+    cachedTheme: 'clean_bento',
+    firestoreTheme: 'neo_brutalist',
+    loadingSettings: false,
+    previewTheme: null,
+  });
+  assert.equal(firestoreOverride.themeReady, true);
+  assert.equal(firestoreOverride.persistedTheme, 'neo_brutalist');
+  assert.equal(firestoreOverride.activeTheme, 'neo_brutalist');
+});
+
+test('validateOrderInput and Netlify create-order handler allow optional empty buyer WhatsApp', async () => {
+  const baseOrder = {
+    customerName: 'Nadia Pratama',
+    customerEmail: 'nadia@example.com',
+    serviceId: 'website-aplikasi',
+    quantityEstimate: 1,
+    projectTitle: 'Company Profile Sekolah',
+    projectBrief: 'Membutuhkan website profil sekolah dengan katalog program dan formulir PPDB.',
+    deadline: '2026-12-10',
+  };
+
+  // Empty WhatsApp is accepted
+  const emptyWa = validateOrderInput({ ...baseOrder, customerWhatsapp: '' }, '2026-11-26');
+  assert.equal(emptyWa.valid, true);
+  assert.deepEqual(emptyWa.errors, {});
+
+  // Whitespace-only WhatsApp is accepted
+  const spacesWa = validateOrderInput({ ...baseOrder, customerWhatsapp: '   ' }, '2026-11-26');
+  assert.equal(spacesWa.valid, true);
+
+  // Invalid non-empty WhatsApp is still rejected
+  const invalidWa = validateOrderInput({ ...baseOrder, customerWhatsapp: '0812' }, '2026-11-26');
+  assert.equal(invalidWa.valid, false);
+  assert.ok(invalidWa.errors.customerWhatsapp);
+
+  // Netlify create-order handler accepts empty WhatsApp, accepts valid WhatsApp, rejects malformed WhatsApp
+  const authHeader = 'Bearer ' + 'a'.repeat(32);
+  const resEmpty = await createOrderHandler({
+    httpMethod: 'POST',
+    headers: { authorization: authHeader },
+    body: JSON.stringify({ ...baseOrder, customerWhatsapp: '' }),
+  });
+  assert.equal(resEmpty.statusCode, 200);
+  assert.match(JSON.parse(resEmpty.body).orderCode, /^SCS-\d{8}-[A-Z0-9]{6}$/);
+
+  const resValid = await createOrderHandler({
+    httpMethod: 'POST',
+    headers: { authorization: authHeader },
+    body: JSON.stringify({ ...baseOrder, customerWhatsapp: '081234567890' }),
+  });
+  assert.equal(resValid.statusCode, 200);
+
+  const resInvalid = await createOrderHandler({
+    httpMethod: 'POST',
+    headers: { authorization: authHeader },
+    body: JSON.stringify({ ...baseOrder, customerWhatsapp: '123' }),
+  });
+  assert.equal(resInvalid.statusCode, 400);
+});
+
+test('validateOptionalSocialUrls and sanitizeHttpUrl allow empty/partial social URLs and reject invalid non-empty URLs', () => {
+  // All empty is valid
+  const allEmpty = validateOptionalSocialUrls({
+    instagramUrl: '',
+    tiktokUrl: '',
+    youtubeUrl: '',
+    linkedinUrl: '',
+  });
+  assert.equal(allEmpty.valid, true);
+  assert.deepEqual(allEmpty.errors, {});
+
+  // Partially filled is valid
+  const partial = validateOptionalSocialUrls({
+    instagramUrl: 'https://instagram.com/syamscreativestudio',
+    tiktokUrl: '',
+    youtubeUrl: '   ',
+    linkedinUrl: 'https://linkedin.com/company/syams-creative-studio',
+  });
+  assert.equal(partial.valid, true);
+
+  // Invalid non-empty URL is rejected
+  const invalid = validateOptionalSocialUrls({
+    instagramUrl: 'instagram.com/tanpa-protokol',
+    tiktokUrl: 'javascript:alert(1)',
+    youtubeUrl: 'https://youtube.com/@syamscreativestudio',
+    linkedinUrl: '',
+  });
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.instagramUrl);
+  assert.ok(invalid.errors.tiktokUrl);
+  assert.equal(invalid.errors.youtubeUrl, undefined);
+  assert.equal(invalid.errors.linkedinUrl, undefined);
+
+  // sanitizeHttpUrl blocks relative paths and XSS while allowing valid http/https domains
+  assert.equal(sanitizeHttpUrl('/relative/path'), '');
+  assert.equal(sanitizeHttpUrl('javascript:alert(1)'), '');
+  assert.equal(sanitizeHttpUrl('https://instagram.com/syams'), 'https://instagram.com/syams');
 });
 
 

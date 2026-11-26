@@ -254,7 +254,14 @@ export function AdminAppearanceSection({
   onRefresh,
   onToast,
 }: AdminAppearanceSectionProps) {
-  const { persistedTheme, previewTheme, isPreviewActive, startPreview, stopPreview } = useTheme();
+  const {
+    persistedTheme,
+    previewTheme,
+    isPreviewActive,
+    startPreview,
+    stopPreview,
+    syncCachedTheme,
+  } = useTheme();
   const currentSavedTheme = normalizeVisualTheme(settings.visualTheme ?? persistedTheme);
   const [selectedTheme, setSelectedTheme] = useState<VisualThemeMode>(
     previewTheme ?? currentSavedTheme
@@ -284,6 +291,7 @@ export function AdminAppearanceSection({
     setApplying(true);
     try {
       const saved = await saveVisualThemeByAdmin(selectedTheme, actor);
+      syncCachedTheme(saved);
       stopPreview();
       await onRefresh();
       const label = saved === 'clean_bento' ? 'Clean Bento Grid' : 'Neo Brutalist';

@@ -101,5 +101,14 @@ test('Site settings allows optional visualTheme enum with public get and strict 
   assert.ok(!blueprint.entities.SiteSettings.required.includes('visualTheme'));
 });
 
+test('Orders rule allows optional empty customerWhatsapp while keeping length bounds when provided', () => {
+  assert.match(
+    rulesSource,
+    /data\.customerWhatsapp is string && \(data\.customerWhatsapp\.size\(\) == 0 \|\| \(data\.customerWhatsapp\.size\(\) >= 9 && data\.customerWhatsapp\.size\(\) <= 25\)\)/
+  );
+  assert.equal(blueprint.entities.Order.properties.customerWhatsapp.minLength, 0);
+  assert.equal(blueprint.entities.Order.properties.customerWhatsapp.maxLength, 25);
+});
+
 
 

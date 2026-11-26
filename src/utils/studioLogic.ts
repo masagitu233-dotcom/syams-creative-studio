@@ -161,6 +161,24 @@ export function sanitizeExternalUrl(url: string | undefined | null): string {
   }
 }
 
+export function sanitizeHttpUrl(url: string | undefined | null): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    if (
+      (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      parsed.hostname.includes('.')
+    ) {
+      return parsed.toString();
+    }
+    return '';
+  } catch {
+    return '';
+  }
+}
+
 export function buildMediaProxyUrl(fileId: string, visibility: MediaVisibility = 'public'): string {
   const cleanId = fileId.trim();
   if (!/^[a-zA-Z0-9_\-]+$/.test(cleanId)) {
@@ -184,7 +202,7 @@ export function slugify(input: string): string {
 export interface OrderValidationInput {
   customerName: string;
   customerEmail: string;
-  customerWhatsapp: string;
+  customerWhatsapp?: string;
   serviceId: string;
   quantityEstimate: number;
   projectTitle: string;
@@ -210,8 +228,10 @@ export function validateOrderInput(input: OrderValidationInput, todayIso?: strin
     errors.customerEmail = 'Alamat email Google tidak valid.';
   }
 
-  if (!input.customerWhatsapp || !isValidWhatsappNumber(input.customerWhatsapp)) {
-    errors.customerWhatsapp = 'Masukkan nomor WhatsApp Indonesia yang valid (contoh: 081234567890).';
+  const trimmedWhatsapp = (input.customerWhatsapp || '').trim();
+  if (trimmedWhatsapp.length > 0 && !isValidWhatsappNumber(trimmedWhatsapp)) {
+    errors.customerWhatsapp =
+      'Format nomor WhatsApp Indonesia tidak valid (contoh: 081234567890), atau kosongkan jika tidak ingin mengisi.';
   }
 
   if (!input.serviceId || !/^[a-zA-Z0-9_\-]+$/.test(input.serviceId)) {
@@ -965,5 +985,110 @@ export function resolveEffectiveVisualTheme(
   }
   return normalizeVisualTheme(persistedTheme);
 }
+
+export const THEME_CACHE_STORAGE_KEY = 'syams_visual_theme_cache';
+
+export function readCachedVisualTheme(
+  storage?: Pick<Storage, 'getItem'> | null
+): VisualThemeMode | null {
+  try {
+    const store =
+      storage !== undefined
+        ? storage
+        : typeof window !== 'undefined'
+          ? window.localStorage
+          : null;
+    if (!store) return null;
+    const raw = store.getItem(THEME_CACHE_STORAGE_KEY);
+    return isValidVisualTheme(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeCachedVisualTheme(
+  theme: unknown,
+  storage?: Pick<Storage, 'setItem'> | null
+): VisualThemeMode | null {
+  if (!isValidVisualTheme(theme)) return null;
+  try {
+    const store =
+      storage !== undefined
+        ? storage
+        : typeof window !== 'undefined'
+          ? window.localStorage
+          : null;
+    if (store) {
+      store.setItem(THEME_CACHE_STORAGE_KEY, theme);
+    }
+  } catch {
+    // Ignore storage quota or private browsing errors
+  }
+  return theme;
+}
+
+export interface InitialThemeResolutionInput {
+  cachedTheme: VisualThemeMode | null;
+  firestoreTheme: unknown;
+  loadingSettings: boolean;
+  previewTheme: VisualThemeMode | null;
+}
+
+export interface InitialThemeResolution {
+  persistedTheme: VisualThemeMode;
+  activeTheme: VisualThemeMode;
+  themeReady: boolean;
+}
+
+export function resolveInitialThemeState(
+  input: InitialThemeResolutionInput
+): InitialThemeResolution {
+  const authoritativeTheme = normalizeVisualTheme(input.firestoreTheme);
+  const persistedTheme = !input.loadingSettings
+    ? authoritativeTheme
+    : input.cachedTheme ?? DEFAULT_VISUAL_THEME;
+  const themeReady =
+    input.previewTheme !== null || !input.loadingSettings || input.cachedTheme !== null;
+  const activeTheme = resolveEffectiveVisualTheme(persistedTheme, input.previewTheme);
+  return {
+    persistedTheme,
+    activeTheme,
+    themeReady,
+  };
+}
+
+export interface OptionalSocialUrlsInput {
+  instagramUrl?: string;
+  tiktokUrl?: string;
+  youtubeUrl?: string;
+  linkedinUrl?: string;
+}
+
+const SOCIAL_FIELD_LABELS: Record<keyof OptionalSocialUrlsInput, string> = {
+  instagramUrl: 'URL Instagram',
+  tiktokUrl: 'URL TikTok',
+  youtubeUrl: 'URL YouTube',
+  linkedinUrl: 'URL LinkedIn',
+};
+
+export function validateOptionalSocialUrls(input: OptionalSocialUrlsInput): ValidationResult {
+  const errors: Record<string, string> = {};
+  (Object.keys(SOCIAL_FIELD_LABELS) as Array<keyof OptionalSocialUrlsInput>).forEach((key) => {
+    const raw = (input[key] || '').trim();
+    if (!raw) return;
+    if (raw.length > 300) {
+      errors[key] = `${SOCIAL_FIELD_LABELS[key]} maksimal 300 karakter.`;
+      return;
+    }
+    if (!sanitizeHttpUrl(raw)) {
+      errors[key] = `${SOCIAL_FIELD_LABELS[key]} harus berupa tautan https:// atau http:// yang valid, atau kosongkan jika tidak digunakan.`;
+    }
+  });
+  return {
+    valid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
 
 

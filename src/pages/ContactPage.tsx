@@ -5,7 +5,7 @@ import { submitContactMessage } from '../services/firestoreService';
 import { formatUserFriendlyError } from '../lib/firestoreErrors';
 import {
   buildWhatsappLink,
-  sanitizeExternalUrl,
+  sanitizeHttpUrl,
   validateContactInput,
 } from '../utils/studioLogic';
 import { Reveal } from '../components/Reveal';
@@ -29,10 +29,10 @@ export function ContactPage() {
   );
 
   const socials = [
-    { label: 'Instagram', url: sanitizeExternalUrl(siteSettings.instagramUrl) },
-    { label: 'TikTok', url: sanitizeExternalUrl(siteSettings.tiktokUrl) },
-    { label: 'YouTube', url: sanitizeExternalUrl(siteSettings.youtubeUrl) },
-    { label: 'LinkedIn', url: sanitizeExternalUrl(siteSettings.linkedinUrl) },
+    { label: 'Instagram', url: sanitizeHttpUrl(siteSettings.instagramUrl) },
+    { label: 'TikTok', url: sanitizeHttpUrl(siteSettings.tiktokUrl) },
+    { label: 'YouTube', url: sanitizeHttpUrl(siteSettings.youtubeUrl) },
+    { label: 'LinkedIn', url: sanitizeHttpUrl(siteSettings.linkedinUrl) },
   ].filter((item) => Boolean(item.url));
 
   async function handleSubmit(e: React.FormEvent) {

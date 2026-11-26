@@ -3,6 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        try {
+          var cached = window.localStorage.getItem('syams_visual_theme_cache');
+          if (cached === 'neo_brutalist' || cached === 'clean_bento') {
+            document.documentElement.setAttribute('data-theme', cached);
+          } else {
+            document.documentElement.setAttribute('data-theme-pending', 'true');
+          }
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme-pending', 'true');
+        }
+      })();
+    </script>
     <title>SYAMS CREATIVE STUDIO — Ide Kreatif, Solusi Digital.</title>
     <meta
       name="description"
@@ -22,7 +36,7 @@
       rel="stylesheet"
     />
   </head>
-  <body class="bg-[#F8F8E1] text-[#171717] antialiased selection:bg-[#F3C95B] selection:text-[#171717]">
+  <body class="text-[#171717] antialiased selection:bg-[#F3C95B] selection:text-[#171717]">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

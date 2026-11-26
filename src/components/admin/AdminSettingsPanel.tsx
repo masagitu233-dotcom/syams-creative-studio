@@ -5,7 +5,7 @@ import {
   updateContactMessageStatus,
 } from '../../services/firestoreService';
 import { formatUserFriendlyError } from '../../lib/firestoreErrors';
-import { formatDateTimeId } from '../../utils/studioLogic';
+import { formatDateTimeId, validateOptionalSocialUrls } from '../../utils/studioLogic';
 import { STUDIO_IMAGES } from '../../data/initialCatalog';
 import { AdminImagePicker } from './AdminImagePicker';
 import { AdminAppearanceSection } from './AdminAppearanceSection';
@@ -36,14 +36,34 @@ export function AdminSettingsPanel({
   onToast,
 }: AdminSettingsPanelProps) {
   const [form, setForm] = useState<SiteSettings>(settings);
+  const [socialErrors, setSocialErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setForm(settings);
+    setSocialErrors({});
   }, [settings]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    const socialCheck = validateOptionalSocialUrls({
+      instagramUrl: form.instagramUrl,
+      tiktokUrl: form.tiktokUrl,
+      youtubeUrl: form.youtubeUrl,
+      linkedinUrl: form.linkedinUrl,
+    });
+    setSocialErrors(socialCheck.errors);
+    if (!socialCheck.valid) {
+      onToast({
+        type: 'error',
+        title: 'Format Tautan Media Sosial Tidak Valid',
+        description:
+          'Gunakan tautan diawali https:// atau http:// yang valid, atau kosongkan kolom yang tidak digunakan.',
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       await saveSiteSettingsByAdmin(form, actor);
@@ -254,54 +274,103 @@ export function AdminSettingsPanel({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label htmlFor="set-ig" className="block text-xs font-bold">
-              URL Instagram
-            </label>
-            <input
-              id="set-ig"
-              type="url"
-              value={form.instagramUrl || ''}
-              onChange={(e) => setForm((f) => ({ ...f, instagramUrl: e.target.value }))}
-              className="nb-input text-sm"
-            />
+        <div className="pt-3.5 border-t-2 border-[#171717]/15 space-y-2.5">
+          <div className="space-y-0.5">
+            <p className="text-xs font-bold text-[#171717]">Tautan Media Sosial (Opsional)</p>
+            <p className="text-[11px] text-[#525252]">
+              Seluruh tautan media sosial bersifat opsional. Kosongkan kolom yang tidak digunakan;
+              tautan kosong tidak akan ditampilkan pada Footer maupun halaman Kontak.
+            </p>
           </div>
-          <div className="space-y-1">
-            <label htmlFor="set-tt" className="block text-xs font-bold">
-              URL TikTok
-            </label>
-            <input
-              id="set-tt"
-              type="url"
-              value={form.tiktokUrl || ''}
-              onChange={(e) => setForm((f) => ({ ...f, tiktokUrl: e.target.value }))}
-              className="nb-input text-sm"
-            />
-          </div>
-          <div className="space-y-1">
-            <label htmlFor="set-yt" className="block text-xs font-bold">
-              URL YouTube
-            </label>
-            <input
-              id="set-yt"
-              type="url"
-              value={form.youtubeUrl || ''}
-              onChange={(e) => setForm((f) => ({ ...f, youtubeUrl: e.target.value }))}
-              className="nb-input text-sm"
-            />
-          </div>
-          <div className="space-y-1">
-            <label htmlFor="set-li" className="block text-xs font-bold">
-              URL LinkedIn
-            </label>
-            <input
-              id="set-li"
-              type="url"
-              value={form.linkedinUrl || ''}
-              onChange={(e) => setForm((f) => ({ ...f, linkedinUrl: e.target.value }))}
-              className="nb-input text-sm"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label htmlFor="set-ig" className="block text-xs font-bold">
+                URL Instagram <span className="font-normal text-[#525252]">(Opsional)</span>
+              </label>
+              <input
+                id="set-ig"
+                type="text"
+                inputMode="url"
+                value={form.instagramUrl || ''}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, instagramUrl: e.target.value }));
+                  if (socialErrors.instagramUrl) {
+                    setSocialErrors((prev) => ({ ...prev, instagramUrl: '' }));
+                  }
+                }}
+                placeholder="https://instagram.com/syamscreativestudio"
+                className="nb-input text-sm"
+              />
+              {socialErrors.instagramUrl && (
+                <p className="text-xs font-medium text-[#6C151E]">{socialErrors.instagramUrl}</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="set-tt" className="block text-xs font-bold">
+                URL TikTok <span className="font-normal text-[#525252]">(Opsional)</span>
+              </label>
+              <input
+                id="set-tt"
+                type="text"
+                inputMode="url"
+                value={form.tiktokUrl || ''}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, tiktokUrl: e.target.value }));
+                  if (socialErrors.tiktokUrl) {
+                    setSocialErrors((prev) => ({ ...prev, tiktokUrl: '' }));
+                  }
+                }}
+                placeholder="https://tiktok.com/@syamscreativestudio"
+                className="nb-input text-sm"
+              />
+              {socialErrors.tiktokUrl && (
+                <p className="text-xs font-medium text-[#6C151E]">{socialErrors.tiktokUrl}</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="set-yt" className="block text-xs font-bold">
+                URL YouTube <span className="font-normal text-[#525252]">(Opsional)</span>
+              </label>
+              <input
+                id="set-yt"
+                type="text"
+                inputMode="url"
+                value={form.youtubeUrl || ''}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, youtubeUrl: e.target.value }));
+                  if (socialErrors.youtubeUrl) {
+                    setSocialErrors((prev) => ({ ...prev, youtubeUrl: '' }));
+                  }
+                }}
+                placeholder="https://youtube.com/@syamscreativestudio"
+                className="nb-input text-sm"
+              />
+              {socialErrors.youtubeUrl && (
+                <p className="text-xs font-medium text-[#6C151E]">{socialErrors.youtubeUrl}</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="set-li" className="block text-xs font-bold">
+                URL LinkedIn <span className="font-normal text-[#525252]">(Opsional)</span>
+              </label>
+              <input
+                id="set-li"
+                type="text"
+                inputMode="url"
+                value={form.linkedinUrl || ''}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, linkedinUrl: e.target.value }));
+                  if (socialErrors.linkedinUrl) {
+                    setSocialErrors((prev) => ({ ...prev, linkedinUrl: '' }));
+                  }
+                }}
+                placeholder="https://linkedin.com/company/syams-creative-studio"
+                className="nb-input text-sm"
+              />
+              {socialErrors.linkedinUrl && (
+                <p className="text-xs font-medium text-[#6C151E]">{socialErrors.linkedinUrl}</p>
+              )}
+            </div>
           </div>
         </div>
 

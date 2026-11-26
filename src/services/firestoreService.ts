@@ -32,6 +32,7 @@ import {
   normalizeVisualTheme,
   normalizeWhatsappNumber,
   sanitizeExternalUrl,
+  sanitizeHttpUrl,
   slugify,
 } from '../utils/studioLogic';
 import type {
@@ -155,15 +156,19 @@ export async function upsertCustomerProfile(params: {
   try {
     const ref = doc(db, 'customers', params.uid);
     const existing = await getDoc(ref);
-    const normalizedWa = normalizeWhatsappNumber(params.whatsapp).slice(0, 25);
+    const normalizedWa = params.whatsapp.trim()
+      ? normalizeWhatsappNumber(params.whatsapp).slice(0, 25)
+      : '';
     const safeName = (params.displayName || 'Pelanggan').trim().slice(0, 120);
     const safePhoto = sanitizeExternalUrl(params.photoURL).slice(0, 500);
 
     if (existing.exists()) {
+      const existingWa =
+        typeof existing.data()?.whatsapp === 'string' ? existing.data().whatsapp : '';
       await updateDoc(ref, {
         displayName: safeName,
         photoURL: safePhoto,
-        whatsapp: normalizedWa,
+        whatsapp: normalizedWa || existingWa,
         updatedAt: serverTimestamp(),
       });
     } else {
@@ -336,7 +341,9 @@ export async function createOrderInFirestore(input: {
       customerUid: input.customerUid,
       customerName: input.customerName.trim().slice(0, 120),
       customerEmail: input.customerEmail.trim().slice(0, 200),
-      customerWhatsapp: normalizeWhatsappNumber(input.customerWhatsapp).slice(0, 25),
+      customerWhatsapp: input.customerWhatsapp.trim()
+        ? normalizeWhatsappNumber(input.customerWhatsapp).slice(0, 25)
+        : '',
       serviceId: input.serviceId.trim().slice(0, 128),
       serviceTitle: input.serviceTitle.trim().slice(0, 140),
       estimatedPriceLabel: input.estimatedPriceLabel.trim().slice(0, 100),
@@ -1274,11 +1281,19 @@ export async function saveSiteSettingsByAdmin(
       operatingHours: settings.operatingHours.trim().slice(0, 120),
       updatedAt: serverTimestamp(),
     };
-    if (settings.aboutMission) payload.aboutMission = settings.aboutMission.trim().slice(0, 1200);
-    if (settings.instagramUrl) payload.instagramUrl = sanitizeExternalUrl(settings.instagramUrl).slice(0, 300);
-    if (settings.tiktokUrl) payload.tiktokUrl = sanitizeExternalUrl(settings.tiktokUrl).slice(0, 300);
-    if (settings.youtubeUrl) payload.youtubeUrl = sanitizeExternalUrl(settings.youtubeUrl).slice(0, 300);
-    if (settings.linkedinUrl) payload.linkedinUrl = sanitizeExternalUrl(settings.linkedinUrl).slice(0, 300);
+    payload.aboutMission = (settings.aboutMission || '').trim().slice(0, 1200);
+    payload.instagramUrl = settings.instagramUrl?.trim()
+      ? sanitizeHttpUrl(settings.instagramUrl).slice(0, 300)
+      : '';
+    payload.tiktokUrl = settings.tiktokUrl?.trim()
+      ? sanitizeHttpUrl(settings.tiktokUrl).slice(0, 300)
+      : '';
+    payload.youtubeUrl = settings.youtubeUrl?.trim()
+      ? sanitizeHttpUrl(settings.youtubeUrl).slice(0, 300)
+      : '';
+    payload.linkedinUrl = settings.linkedinUrl?.trim()
+      ? sanitizeHttpUrl(settings.linkedinUrl).slice(0, 300)
+      : '';
 
     if (settings.visualTheme) {
       payload.visualTheme = normalizeVisualTheme(settings.visualTheme);
