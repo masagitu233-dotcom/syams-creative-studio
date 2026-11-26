@@ -1,0 +1,46 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Google Drive Media Proxy (Public cached & Private authenticated)
+[[redirects]]
+  from = "/api/media/:fileId"
+  to = "/.netlify/functions/media?fileId=:fileId"
+  status = 200
+
+[[redirects]]
+  from = "/api/drive/upload"
+  to = "/.netlify/functions/drive-upload"
+  status = 200
+
+[[redirects]]
+  from = "/api/drive/status"
+  to = "/.netlify/functions/drive-status"
+  status = 200
+
+[[redirects]]
+  from = "/api/orders/prepare"
+  to = "/.netlify/functions/create-order"
+  status = 200
+
+# SPA fallback untuk React Router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/api/media/*"
+  [headers.values]
+    Vary = "Authorization"

@@ -1,0 +1,697 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Administrator utama SYAMS CREATIVE STUDIO yang didaftarkan secara manual berdasarkan UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 200
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "enum": ["super_admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "createdAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Profil pribadi pelanggan yang masuk menggunakan Google Sign-In saat checkout.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 200
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "whatsapp": {
+          "type": "string",
+          "maxLength": 25
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "email", "whatsapp", "createdAt", "updatedAt"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Layanan digital beserta estimasi harga dinamis yang dikelola admin melalui Firestore.",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "pattern": "^[a-z0-9\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 140
+        },
+        "category": {
+          "type": "string",
+          "enum": ["web_app", "video", "desain", "presentasi", "naskah"]
+        },
+        "shortDescription": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 320
+        },
+        "fullDescription": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 3000
+        },
+        "priceMin": {
+          "type": "number"
+        },
+        "priceMax": {
+          "type": "number"
+        },
+        "priceUnit": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "priceLabel": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 100
+        },
+        "estimatedTurnaround": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "deliverables": {
+          "type": "array"
+        },
+        "accentColor": {
+          "type": "string",
+          "enum": ["#0F3D3A", "#6C151E", "#8ACCD5", "#F3C95B"]
+        },
+        "imageUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "driveFileId": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "sortOrder": {
+          "type": "number"
+        },
+        "isFeatured": {
+          "type": "boolean"
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "slug",
+        "title",
+        "category",
+        "shortDescription",
+        "fullDescription",
+        "priceMin",
+        "priceMax",
+        "priceUnit",
+        "priceLabel",
+        "estimatedTurnaround",
+        "deliverables",
+        "accentColor",
+        "imageUrl",
+        "sortOrder",
+        "isFeatured",
+        "isPublished",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Data pemesanan jasa digital pelanggan dengan estimasi awal dan konfirmasi harga final oleh admin.",
+      "type": "object",
+      "properties": {
+        "orderCode": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 32,
+          "pattern": "^SCS-[0-9]{8}-[A-Z0-9]{4,8}$"
+        },
+        "customerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "customerEmail": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 200
+        },
+        "customerWhatsapp": {
+          "type": "string",
+          "minLength": 9,
+          "maxLength": 25
+        },
+        "serviceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "serviceTitle": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 140
+        },
+        "estimatedPriceLabel": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 100
+        },
+        "quantityEstimate": {
+          "type": "number"
+        },
+        "projectTitle": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "projectBrief": {
+          "type": "string",
+          "minLength": 15,
+          "maxLength": 3000
+        },
+        "deadline": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 30
+        },
+        "attachmentName": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "attachmentDriveFileId": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "attachmentUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "menunggu_konfirmasi",
+            "harga_dikonfirmasi",
+            "dalam_pengerjaan",
+            "revisi",
+            "selesai",
+            "dibatalkan"
+          ]
+        },
+        "finalPrice": {
+          "type": "number"
+        },
+        "adminNote": {
+          "type": "string",
+          "maxLength": 1500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "orderCode",
+        "customerUid",
+        "customerName",
+        "customerEmail",
+        "customerWhatsapp",
+        "serviceId",
+        "serviceTitle",
+        "estimatedPriceLabel",
+        "quantityEstimate",
+        "projectTitle",
+        "projectBrief",
+        "deadline",
+        "status",
+        "adminNote",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PortfolioItem": {
+      "title": "PortfolioItem",
+      "description": "Karya pilihan SYAMS CREATIVE STUDIO untuk ditampilkan pada halaman publik.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 140
+        },
+        "clientName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "category": {
+          "type": "string",
+          "enum": ["web_app", "video", "desain", "presentasi", "naskah"]
+        },
+        "year": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 350
+        },
+        "challenge": {
+          "type": "string",
+          "maxLength": 1200
+        },
+        "outcome": {
+          "type": "string",
+          "maxLength": 1200
+        },
+        "metrics": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "imageUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "driveFileId": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "projectUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "isFeatured": {
+          "type": "boolean"
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "sortOrder": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "title",
+        "clientName",
+        "category",
+        "year",
+        "summary",
+        "outcome",
+        "metrics",
+        "imageUrl",
+        "isFeatured",
+        "isPublished",
+        "sortOrder",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MediaAsset": {
+      "title": "MediaAsset",
+      "description": "Metadata berkas gambar, ilustrasi, atau lampiran yang disimpan pada Google Drive.",
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "mimeType": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "sizeBytes": {
+          "type": "number"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public", "private"]
+        },
+        "usage": {
+          "type": "string",
+          "enum": ["service", "portfolio", "hero", "order_attachment", "other"]
+        },
+        "altText": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "ownerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "fileId",
+        "fileName",
+        "mimeType",
+        "sizeBytes",
+        "visibility",
+        "usage",
+        "ownerUid",
+        "createdAt"
+      ]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Pengaturan konten utama, kontak, dan tautan media sosial SYAMS CREATIVE STUDIO.",
+      "type": "object",
+      "properties": {
+        "studioName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "slogan": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "heroHeadline": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "heroSubheadline": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "aboutSummary": {
+          "type": "string",
+          "maxLength": 1500
+        },
+        "aboutMission": {
+          "type": "string",
+          "maxLength": 1200
+        },
+        "whatsappNumber": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "operatingHours": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "instagramUrl": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "tiktokUrl": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "youtubeUrl": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "linkedinUrl": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "studioName",
+        "slogan",
+        "heroHeadline",
+        "heroSubheadline",
+        "aboutSummary",
+        "whatsappNumber",
+        "email",
+        "address",
+        "operatingHours",
+        "updatedAt"
+      ]
+    },
+    "FaqItem": {
+      "title": "FaqItem",
+      "description": "Daftar pertanyaan yang sering diajukan oleh calon pelanggan.",
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 260
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 2000
+        },
+        "category": {
+          "type": "string",
+          "enum": ["pemesanan", "harga", "revisi", "teknis"]
+        },
+        "sortOrder": {
+          "type": "number"
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "question",
+        "answer",
+        "category",
+        "sortOrder",
+        "isPublished",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Catatan audit aktivitas administrator untuk transparansi perubahan konten dan pesanan.",
+      "type": "object",
+      "properties": {
+        "actorUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actorEmail": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "action": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "entityType": {
+          "type": "string",
+          "enum": ["order", "service", "portfolio", "media", "faq", "site_settings", "admin", "contact"]
+        },
+        "entityId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 400
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "actorUid",
+        "actorEmail",
+        "action",
+        "entityType",
+        "entityId",
+        "summary",
+        "createdAt"
+      ]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Pesan pertanyaan yang dikirim melalui halaman Kontak publik.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 200
+        },
+        "whatsapp": {
+          "type": "string",
+          "maxLength": 25
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "message": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 2000
+        },
+        "status": {
+          "type": "string",
+          "enum": ["baru", "dibalas", "arsip"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["name", "email", "subject", "message", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Dokumen administrator utama yang didaftarkan secara manual berdasarkan UID."
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Profil pribadi pelanggan; hanya dapat diakses pemilik UID dan admin."
+    },
+    "/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/Service" },
+      "description": "Katalog layanan dan estimasi harga dinamis."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Pesanan jasa digital; pelanggan hanya dapat membaca pesanan dengan customerUid miliknya."
+    },
+    "/portfolio/{portfolioId}": {
+      "schema": { "$ref": "#/entities/PortfolioItem" },
+      "description": "Portofolio karya studio."
+    },
+    "/media/{mediaId}": {
+      "schema": { "$ref": "#/entities/MediaAsset" },
+      "description": "Metadata file Google Drive publik maupun privat."
+    },
+    "/site_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SiteSettings" },
+      "description": "Pengaturan konten utama, kontak, dan media sosial studio."
+    },
+    "/faqs/{faqId}": {
+      "schema": { "$ref": "#/entities/FaqItem" },
+      "description": "Daftar pertanyaan umum (FAQ)."
+    },
+    "/activity_logs/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Log aktivitas administratif yang bersifat append-only."
+    },
+    "/contact_messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ContactMessage" },
+      "description": "Pesan masuk dari halaman Kontak publik."
+    }
+  }
+}

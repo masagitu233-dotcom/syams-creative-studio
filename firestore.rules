@@ -1,0 +1,480 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 0: Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Hardened Primitives
+    // -------------------------------------------------------------------------
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrapAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'masagitu233@gmail.com';
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        isBootstrapAdmin() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidOptionalString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validation Blueprints (Pillar 2 & Pillar 5)
+    // -------------------------------------------------------------------------
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 5 && data.email.size() <= 200 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        data.role == 'super_admin' &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'whatsapp', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'whatsapp', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        data.email is string && data.email.size() >= 5 && data.email.size() <= 200 &&
+        isValidOptionalString(data, 'photoURL', 500) &&
+        data.whatsapp is string && data.whatsapp.size() <= 25 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidService(data) {
+      return data.keys().hasAll([
+          'slug', 'title', 'category', 'shortDescription', 'fullDescription',
+          'priceMin', 'priceMax', 'priceUnit', 'priceLabel', 'estimatedTurnaround',
+          'deliverables', 'accentColor', 'imageUrl', 'sortOrder', 'isFeatured',
+          'isPublished', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'slug', 'title', 'category', 'shortDescription', 'fullDescription',
+          'priceMin', 'priceMax', 'priceUnit', 'priceLabel', 'estimatedTurnaround',
+          'deliverables', 'accentColor', 'imageUrl', 'driveFileId', 'sortOrder',
+          'isFeatured', 'isPublished', 'createdAt', 'updatedAt'
+        ]) &&
+        data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 80 && data.slug.matches('^[a-z0-9\\-]+$') &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 140 &&
+        data.category in ['web_app', 'video', 'desain', 'presentasi', 'naskah'] &&
+        data.shortDescription is string && data.shortDescription.size() >= 10 && data.shortDescription.size() <= 320 &&
+        data.fullDescription is string && data.fullDescription.size() >= 20 && data.fullDescription.size() <= 3000 &&
+        data.priceMin is number && data.priceMin >= 0 && data.priceMin <= 1000000000 &&
+        data.priceMax is number && data.priceMax >= data.priceMin && data.priceMax <= 1000000000 &&
+        data.priceUnit is string && data.priceUnit.size() >= 1 && data.priceUnit.size() <= 40 &&
+        data.priceLabel is string && data.priceLabel.size() >= 3 && data.priceLabel.size() <= 100 &&
+        data.estimatedTurnaround is string && data.estimatedTurnaround.size() >= 2 && data.estimatedTurnaround.size() <= 60 &&
+        data.deliverables is list && data.deliverables.size() >= 1 && data.deliverables.size() <= 12 &&
+        data.deliverables[0] is string && data.deliverables[0].size() <= 180 &&
+        data.accentColor in ['#0F3D3A', '#6C151E', '#8ACCD5', '#F3C95B'] &&
+        data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 500 &&
+        isValidOptionalString(data, 'driveFileId', 200) &&
+        data.sortOrder is number && data.sortOrder >= 0 && data.sortOrder <= 9999 &&
+        data.isFeatured is bool &&
+        data.isPublished is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll([
+          'orderCode', 'customerUid', 'customerName', 'customerEmail', 'customerWhatsapp',
+          'serviceId', 'serviceTitle', 'estimatedPriceLabel', 'quantityEstimate',
+          'projectTitle', 'projectBrief', 'deadline', 'status', 'finalPrice',
+          'adminNote', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orderCode', 'customerUid', 'customerName', 'customerEmail', 'customerWhatsapp',
+          'serviceId', 'serviceTitle', 'estimatedPriceLabel', 'quantityEstimate',
+          'projectTitle', 'projectBrief', 'deadline', 'attachmentName',
+          'attachmentDriveFileId', 'attachmentUrl', 'status', 'finalPrice',
+          'adminNote', 'createdAt', 'updatedAt'
+        ]) &&
+        data.orderCode is string && data.orderCode.size() >= 8 && data.orderCode.size() <= 32 && data.orderCode.matches('^SCS-[0-9]{8}-[A-Z0-9]{4,8}$') &&
+        isValidId(data.customerUid) &&
+        data.customerName is string && data.customerName.size() >= 2 && data.customerName.size() <= 120 &&
+        data.customerEmail is string && data.customerEmail.size() >= 5 && data.customerEmail.size() <= 200 &&
+        data.customerWhatsapp is string && data.customerWhatsapp.size() >= 9 && data.customerWhatsapp.size() <= 25 &&
+        isValidId(data.serviceId) &&
+        data.serviceTitle is string && data.serviceTitle.size() >= 3 && data.serviceTitle.size() <= 140 &&
+        data.estimatedPriceLabel is string && data.estimatedPriceLabel.size() >= 3 && data.estimatedPriceLabel.size() <= 100 &&
+        data.quantityEstimate is number && data.quantityEstimate >= 1 && data.quantityEstimate <= 1000 &&
+        data.projectTitle is string && data.projectTitle.size() >= 3 && data.projectTitle.size() <= 160 &&
+        data.projectBrief is string && data.projectBrief.size() >= 15 && data.projectBrief.size() <= 3000 &&
+        data.deadline is string && data.deadline.size() >= 8 && data.deadline.size() <= 30 &&
+        isValidOptionalString(data, 'attachmentName', 200) &&
+        isValidOptionalString(data, 'attachmentDriveFileId', 200) &&
+        isValidOptionalString(data, 'attachmentUrl', 500) &&
+        data.status in [
+          'menunggu_konfirmasi', 'harga_dikonfirmasi', 'dalam_pengerjaan',
+          'revisi', 'selesai', 'dibatalkan'
+        ] &&
+        (data.finalPrice == null || (data.finalPrice is number && data.finalPrice >= 0 && data.finalPrice <= 1000000000)) &&
+        data.adminNote is string && data.adminNote.size() <= 1500 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPortfolio(data) {
+      return data.keys().hasAll([
+          'title', 'clientName', 'category', 'year', 'summary', 'outcome',
+          'metrics', 'imageUrl', 'isFeatured', 'isPublished', 'sortOrder',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'title', 'clientName', 'category', 'year', 'summary', 'challenge',
+          'outcome', 'metrics', 'imageUrl', 'driveFileId', 'projectUrl',
+          'isFeatured', 'isPublished', 'sortOrder', 'createdAt', 'updatedAt'
+        ]) &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 140 &&
+        data.clientName is string && data.clientName.size() >= 2 && data.clientName.size() <= 100 &&
+        data.category in ['web_app', 'video', 'desain', 'presentasi', 'naskah'] &&
+        data.year is string && data.year.size() >= 4 && data.year.size() <= 10 &&
+        data.summary is string && data.summary.size() >= 10 && data.summary.size() <= 350 &&
+        isValidOptionalString(data, 'challenge', 1200) &&
+        data.outcome is string && data.outcome.size() >= 5 && data.outcome.size() <= 1200 &&
+        data.metrics is string && data.metrics.size() >= 2 && data.metrics.size() <= 120 &&
+        data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 500 &&
+        isValidOptionalString(data, 'driveFileId', 200) &&
+        isValidOptionalString(data, 'projectUrl', 500) &&
+        data.isFeatured is bool &&
+        data.isPublished is bool &&
+        data.sortOrder is number && data.sortOrder >= 0 && data.sortOrder <= 9999 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidMedia(data) {
+      return data.keys().hasAll([
+          'fileId', 'fileName', 'mimeType', 'sizeBytes', 'visibility',
+          'usage', 'ownerUid', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'fileId', 'fileName', 'mimeType', 'sizeBytes', 'visibility',
+          'usage', 'altText', 'ownerUid', 'createdAt'
+        ]) &&
+        data.fileId is string && data.fileId.size() >= 3 && data.fileId.size() <= 200 &&
+        data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 200 &&
+        data.mimeType is string && data.mimeType.size() >= 3 && data.mimeType.size() <= 100 &&
+        data.sizeBytes is number && data.sizeBytes >= 0 && data.sizeBytes <= 104857600 &&
+        data.visibility in ['public', 'private'] &&
+        data.usage in ['service', 'portfolio', 'hero', 'order_attachment', 'other'] &&
+        isValidOptionalString(data, 'altText', 240) &&
+        isValidId(data.ownerUid) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidSiteSettings(data) {
+      return data.keys().hasAll([
+          'studioName', 'slogan', 'heroHeadline', 'heroSubheadline', 'aboutSummary',
+          'whatsappNumber', 'email', 'address', 'operatingHours', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'studioName', 'slogan', 'heroHeadline', 'heroSubheadline', 'aboutSummary',
+          'aboutMission', 'whatsappNumber', 'email', 'address', 'operatingHours',
+          'instagramUrl', 'tiktokUrl', 'youtubeUrl', 'linkedinUrl', 'updatedAt'
+        ]) &&
+        data.studioName is string && data.studioName.size() >= 2 && data.studioName.size() <= 100 &&
+        data.slogan is string && data.slogan.size() >= 3 && data.slogan.size() <= 160 &&
+        data.heroHeadline is string && data.heroHeadline.size() >= 5 && data.heroHeadline.size() <= 200 &&
+        data.heroSubheadline is string && data.heroSubheadline.size() >= 10 && data.heroSubheadline.size() <= 500 &&
+        data.aboutSummary is string && data.aboutSummary.size() >= 10 && data.aboutSummary.size() <= 1500 &&
+        isValidOptionalString(data, 'aboutMission', 1200) &&
+        data.whatsappNumber is string && data.whatsappNumber.size() >= 8 && data.whatsappNumber.size() <= 30 &&
+        data.email is string && data.email.size() >= 5 && data.email.size() <= 200 &&
+        data.address is string && data.address.size() >= 4 && data.address.size() <= 240 &&
+        data.operatingHours is string && data.operatingHours.size() >= 4 && data.operatingHours.size() <= 120 &&
+        isValidOptionalString(data, 'instagramUrl', 300) &&
+        isValidOptionalString(data, 'tiktokUrl', 300) &&
+        isValidOptionalString(data, 'youtubeUrl', 300) &&
+        isValidOptionalString(data, 'linkedinUrl', 300) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidFaq(data) {
+      return data.keys().hasAll([
+          'question', 'answer', 'category', 'sortOrder', 'isPublished', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'question', 'answer', 'category', 'sortOrder', 'isPublished', 'createdAt', 'updatedAt'
+        ]) &&
+        data.question is string && data.question.size() >= 5 && data.question.size() <= 260 &&
+        data.answer is string && data.answer.size() >= 10 && data.answer.size() <= 2000 &&
+        data.category in ['pemesanan', 'harga', 'revisi', 'teknis'] &&
+        data.sortOrder is number && data.sortOrder >= 0 && data.sortOrder <= 9999 &&
+        data.isPublished is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidActivityLog(data) {
+      return data.keys().hasAll([
+          'actorUid', 'actorEmail', 'action', 'entityType', 'entityId', 'summary', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'actorUid', 'actorEmail', 'action', 'entityType', 'entityId', 'summary', 'createdAt'
+        ]) &&
+        isValidId(data.actorUid) &&
+        data.actorEmail is string && data.actorEmail.size() >= 5 && data.actorEmail.size() <= 200 &&
+        data.action is string && data.action.size() >= 2 && data.action.size() <= 80 &&
+        data.entityType in ['order', 'service', 'portfolio', 'media', 'faq', 'site_settings', 'admin', 'contact'] &&
+        data.entityId is string && data.entityId.size() >= 1 && data.entityId.size() <= 128 &&
+        data.summary is string && data.summary.size() >= 3 && data.summary.size() <= 400 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidContactMessage(data) {
+      return data.keys().hasAll(['name', 'email', 'subject', 'message', 'status', 'createdAt']) &&
+        data.keys().hasOnly(['name', 'email', 'whatsapp', 'subject', 'message', 'status', 'createdAt']) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 120 &&
+        data.email is string && data.email.size() >= 5 && data.email.size() <= 200 &&
+        isValidOptionalString(data, 'whatsapp', 25) &&
+        data.subject is string && data.subject.size() >= 3 && data.subject.size() <= 160 &&
+        data.message is string && data.message.size() >= 10 && data.message.size() <= 2000 &&
+        data.status in ['baru', 'dibalas', 'arsip'] &&
+        data.createdAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+
+    // 1. Admins (Single admin / manually registered UIDs; no public signup)
+    match /admins/{adminId} {
+      allow get: if isVerifiedUser() && isValidId(adminId) && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isVerifiedUser() && isValidId(adminId) && isValidAdmin(incoming()) &&
+        incoming().uid == adminId &&
+        incoming().createdAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() && isValidId(adminId) && isValidAdmin(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email']);
+      allow delete: if isVerifiedUser() && isValidId(adminId) && isAdmin() && request.auth.uid != adminId;
+    }
+
+    // 2. Customers (Strict PII isolation)
+    match /customers/{customerId} {
+      allow get: if isVerifiedUser() && isValidId(customerId) && (request.auth.uid == customerId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isVerifiedUser() && isValidId(customerId) &&
+        request.auth.uid == customerId &&
+        isValidCustomer(incoming()) &&
+        incoming().uid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(customerId) && isValidCustomer(incoming()) && (
+        (
+          request.auth.uid == customerId &&
+          incoming().uid == existing().uid &&
+          incoming().email == existing().email &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'whatsapp', 'updatedAt'])
+        ) || (
+          isAdmin() &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'whatsapp', 'updatedAt'])
+        )
+      );
+      allow delete: if isVerifiedUser() && isValidId(customerId) && isAdmin();
+    }
+
+    // 3. Services (Dynamic pricing catalog managed by Admin)
+    match /services/{serviceId} {
+      allow get: if isValidId(serviceId) && (existing().isPublished == true || isAdmin());
+      allow list: if resource.data.isPublished == true || isAdmin();
+      allow create: if isVerifiedUser() && isValidId(serviceId) && isValidService(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() && isValidId(serviceId) && isValidService(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'slug', 'title', 'category', 'shortDescription', 'fullDescription',
+          'priceMin', 'priceMax', 'priceUnit', 'priceLabel', 'estimatedTurnaround',
+          'deliverables', 'accentColor', 'imageUrl', 'driveFileId', 'sortOrder',
+          'isFeatured', 'isPublished', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(serviceId) && isAdmin();
+    }
+
+    // 4. Orders (Customer owns own orders; Admin confirms final price & status)
+    match /orders/{orderId} {
+      allow get: if isVerifiedUser() && isValidId(orderId) && (existing().customerUid == request.auth.uid || isAdmin());
+      allow list: if isVerifiedUser() && (resource.data.customerUid == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() && isValidId(orderId) && isValidOrder(incoming()) &&
+        incoming().customerUid == request.auth.uid &&
+        incoming().status == 'menunggu_konfirmasi' &&
+        incoming().finalPrice == null &&
+        incoming().adminNote == '' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(orderId) && isValidOrder(incoming()) && (
+        // Action 1: Admin confirms price / updates workflow status / adds note
+        (
+          isAdmin() &&
+          incoming().customerUid == existing().customerUid &&
+          incoming().orderCode == existing().orderCode &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'finalPrice', 'adminNote', 'updatedAt'])
+        ) ||
+        // Action 2: Customer cancels pending order before confirmation (terminal-state locked)
+        (
+          existing().customerUid == request.auth.uid &&
+          existing().status == 'menunggu_konfirmasi' &&
+          incoming().status == 'dibatalkan' &&
+          incoming().customerUid == existing().customerUid &&
+          incoming().orderCode == existing().orderCode &&
+          incoming().finalPrice == existing().finalPrice &&
+          incoming().adminNote == existing().adminNote &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+        )
+      );
+      allow delete: if isVerifiedUser() && isValidId(orderId) && isAdmin();
+    }
+
+    // 5. Portfolio
+    match /portfolio/{portfolioId} {
+      allow get: if isValidId(portfolioId) && (existing().isPublished == true || isAdmin());
+      allow list: if resource.data.isPublished == true || isAdmin();
+      allow create: if isVerifiedUser() && isValidId(portfolioId) && isValidPortfolio(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() && isValidId(portfolioId) && isValidPortfolio(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'clientName', 'category', 'year', 'summary', 'challenge',
+          'outcome', 'metrics', 'imageUrl', 'driveFileId', 'projectUrl',
+          'isFeatured', 'isPublished', 'sortOrder', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(portfolioId) && isAdmin();
+    }
+
+    // 6. Media (Google Drive metadata; public vs private separation)
+    match /media/{mediaId} {
+      allow get: if isValidId(mediaId) && (
+        existing().visibility == 'public' ||
+        (isVerifiedUser() && existing().ownerUid == request.auth.uid) ||
+        isAdmin()
+      );
+      allow list: if resource.data.visibility == 'public' ||
+        (isVerifiedUser() && resource.data.ownerUid == request.auth.uid) ||
+        isAdmin();
+      allow create: if isVerifiedUser() && isValidId(mediaId) && isValidMedia(incoming()) &&
+        incoming().ownerUid == request.auth.uid &&
+        incoming().createdAt == request.time && (
+          isAdmin() ||
+          (incoming().visibility == 'private' && incoming().usage == 'order_attachment')
+        );
+      allow update: if isVerifiedUser() && isValidId(mediaId) && isValidMedia(incoming()) &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().createdAt == existing().createdAt &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['fileName', 'visibility', 'usage', 'altText']);
+      allow delete: if isVerifiedUser() && isValidId(mediaId) && isAdmin();
+    }
+
+    // 7. Site Settings (Public studio info; Admin write only)
+    match /site_settings/{settingId} {
+      allow get: if isValidId(settingId);
+      allow list: if false;
+      allow create: if isVerifiedUser() && isValidId(settingId) && isValidSiteSettings(incoming()) &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() && isValidId(settingId) && isValidSiteSettings(incoming()) &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'studioName', 'slogan', 'heroHeadline', 'heroSubheadline', 'aboutSummary',
+          'aboutMission', 'whatsappNumber', 'email', 'address', 'operatingHours',
+          'instagramUrl', 'tiktokUrl', 'youtubeUrl', 'linkedinUrl', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // 8. FAQs
+    match /faqs/{faqId} {
+      allow get: if isValidId(faqId) && (existing().isPublished == true || isAdmin());
+      allow list: if resource.data.isPublished == true || isAdmin();
+      allow create: if isVerifiedUser() && isValidId(faqId) && isValidFaq(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() && isValidId(faqId) && isValidFaq(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'question', 'answer', 'category', 'sortOrder', 'isPublished', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(faqId) && isAdmin();
+    }
+
+    // 9. Activity Logs (Append-only immutable audit log for Admins)
+    match /activity_logs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isVerifiedUser() && isValidId(logId) && isValidActivityLog(incoming()) &&
+        incoming().actorUid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        isAdmin();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // 10. Contact Messages (Public submit; Admin triage only)
+    match /contact_messages/{messageId} {
+      allow get: if isValidId(messageId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(messageId) && isValidContactMessage(incoming()) &&
+        incoming().status == 'baru' &&
+        incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(messageId) && isValidContactMessage(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+      allow delete: if isVerifiedUser() && isValidId(messageId) && isAdmin();
+    }
+  }
+}

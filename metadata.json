@@ -1,0 +1,8 @@
+{
+  "name": "SYAMS CREATIVE STUDIO",
+  "description": "Ide Kreatif, Solusi Digital. Platform informasi, katalog layanan, portofolio, pemesanan jasa digital, dan dashboard manajemen studio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
