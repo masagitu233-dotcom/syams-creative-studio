@@ -10,9 +10,11 @@ import {
   signResumableSession,
   validateUploadMetadata,
   verifyResumableSession,
+  type NetlifyEvent,
+  type NetlifyResponse,
 } from './_driveShared';
 
-test('Drive backend validates file IDs, MIME types, extensions, and size limits', () => {
+function runUploadMetadataChecks() {
   assert.equal(isValidDriveId('1AbCdEf_234-xyz'), true);
   assert.equal(isValidDriveId('../../etc/passwd'), false);
   assert.equal(isValidDriveId('ab'), false);
@@ -56,11 +58,12 @@ test('Drive backend validates file IDs, MIME types, extensions, and size limits'
     }).ok,
     false
   );
-});
+}
 
-test('HMAC resumable session token prevents tampering, expiration, and SSRF upload URLs', () => {
+function runResumableSessionChecks() {
   const testKey = 'unit-test-hmac-secret-key';
-  const validUploadUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=abc123';
+  const validUploadUrl =
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=abc123';
   assert.equal(isTrustedGoogleUploadUrl(validUploadUrl), true);
   assert.equal(isTrustedGoogleUploadUrl('https://evil.example.com/upload'), false);
   assert.equal(isTrustedGoogleUploadUrl('http://169.254.169.254/latest/meta-data'), false);
@@ -123,18 +126,86 @@ test('HMAC resumable session token prevents tampering, expiration, and SSRF uplo
     testKey
   );
   assert.equal(verifyResumableSession(expiredToken, testKey), null);
-});
+}
 
-test('Drive error classifier and folder query escaping handle edge cases cleanly', () => {
+function runDriveErrorAndQueryChecks() {
   assert.equal(escapeDriveQueryValue("O'Brien \\ Studio"), "O\\'Brien \\\\ Studio");
   assert.equal(buildEntityFolderKey('product', 'deck-kuliah-01'), 'product_deck-kuliah-01');
-  assert.equal(buildEntityFolderName('Template PPT Modern', 'prod_abc123'), 'Template PPT Modern [prod_abc123]');
+  assert.equal(
+    buildEntityFolderName('Template PPT Modern', 'prod_abc123'),
+    'Template PPT Modern [prod_abc123]'
+  );
 
-  const expiredErr = classifyDriveError({ message: 'invalid_grant: Token has been expired or revoked.' });
+  const expiredErr = classifyDriveError({
+    message: 'invalid_grant: Token has been expired or revoked.',
+  });
   assert.equal(expiredErr.code, 'drive_token_expired');
   assert.equal(expiredErr.status, 502);
 
   const notFoundErr = classifyDriveError({ status: 404, message: 'File not found' });
   assert.equal(notFoundErr.code, 'drive_not_found');
   assert.equal(notFoundErr.status, 404);
-});
+}
+
+const DRIVE_SHARED_SUITES = [
+  {
+    name: 'Drive backend validates file IDs, MIME types, extensions, and size limits',
+    run: runUploadMetadataChecks,
+  },
+  {
+    name: 'HMAC resumable session token prevents tampering, expiration, and SSRF upload URLs',
+    run: runResumableSessionChecks,
+  },
+  {
+    name: 'Drive error classifier and folder query escaping handle edge cases cleanly',
+    run: runDriveErrorAndQueryChecks,
+  },
+];
+
+const isNodeTestRunner =
+  process.execArgv.includes('--test') ||
+  process.argv.includes('--test') ||
+  Boolean(process.env.NODE_TEST_CONTEXT);
+
+if (isNodeTestRunner) {
+  for (const suite of DRIVE_SHARED_SUITES) {
+    test(suite.name, suite.run);
+  }
+}
+
+export async function handler(event: NetlifyEvent): Promise<NetlifyResponse> {
+  if (event.httpMethod !== 'GET') {
+    return {
+      statusCode: 405,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      body: JSON.stringify({ error: 'Method not allowed.' }),
+    };
+  }
+
+  const results: { name: string; passed: boolean; error?: string }[] = [];
+  for (const suite of DRIVE_SHARED_SUITES) {
+    try {
+      suite.run();
+      results.push({ name: suite.name, passed: true });
+    } catch (err) {
+      results.push({
+        name: suite.name,
+        passed: false,
+        error: err instanceof Error ? err.message : 'Test failed',
+      });
+    }
+  }
+
+  const allPassed = results.every((r) => r.passed);
+  return {
+    statusCode: allPassed ? 200 : 500,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    body: JSON.stringify({
+      ok: allPassed,
+      functionName: 'driveSharedTest',
+      passed: results.filter((r) => r.passed).length,
+      total: results.length,
+      checks: results,
+    }),
+  };
+}
