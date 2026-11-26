@@ -3,6 +3,8 @@ import { MotionConfig } from 'framer-motion';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider } from './contexts/AuthContext';
 import { StudioDataProvider } from './contexts/StudioDataContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ThemePreviewBanner } from './components/ThemePreviewBanner';
 import { PublicLayout } from './components/PublicLayout';
 import { HomePage } from './pages/HomePage';
 import { ServicesPage } from './pages/ServicesPage';
@@ -24,8 +26,9 @@ export default function App() {
       <MotionConfig reducedMotion="user">
         <AuthProvider>
           <StudioDataProvider>
-            <BrowserRouter>
-              <Routes>
+            <ThemeProvider>
+              <BrowserRouter>
+                <Routes>
                 <Route
                   path="/"
                   element={
@@ -124,8 +127,10 @@ export default function App() {
                 />
                 <Route path="/admin/*" element={<AdminDashboardPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </BrowserRouter>
+                </Routes>
+                <ThemePreviewBanner />
+              </BrowserRouter>
+            </ThemeProvider>
           </StudioDataProvider>
         </AuthProvider>
       </MotionConfig>

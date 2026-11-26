@@ -8,6 +8,7 @@ import { formatUserFriendlyError } from '../../lib/firestoreErrors';
 import { formatDateTimeId } from '../../utils/studioLogic';
 import { STUDIO_IMAGES } from '../../data/initialCatalog';
 import { AdminImagePicker } from './AdminImagePicker';
+import { AdminAppearanceSection } from './AdminAppearanceSection';
 import type {
   ContactMessage,
   DriveFolderRecord,
@@ -78,18 +79,26 @@ export function AdminSettingsPanel({
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="font-display font-bold text-lg sm:text-xl text-[#171717]">
-          Konten Website, Kontak & Media Sosial
-        </h2>
-        <p className="text-xs sm:text-sm text-[#525252]">
-          Perubahan pada dokumen <code className="font-mono text-xs">site_settings/general</code>{' '}
-          langsung tercermin pada Beranda, Tentang Kami, Kontak, dan Footer.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <AdminAppearanceSection
+        settings={settings}
+        actor={actor}
+        onRefresh={onRefresh}
+        onToast={onToast}
+      />
 
-      <form onSubmit={handleSubmit} className="nb-card p-5 space-y-4">
+      <div className="space-y-4">
+        <div>
+          <h2 className="font-display font-bold text-lg sm:text-xl text-[#171717]">
+            Konten Website, Kontak & Media Sosial
+          </h2>
+          <p className="text-xs sm:text-sm text-[#525252]">
+            Perubahan pada dokumen <code className="font-mono text-xs">site_settings/general</code>{' '}
+            langsung tercermin pada Beranda, Tentang Kami, Kontak, dan Footer.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="nb-card p-5 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
             <label htmlFor="set-name" className="block text-xs font-bold">
@@ -303,6 +312,7 @@ export function AdminSettingsPanel({
           </button>
         </div>
       </form>
+      </div>
 
       {/* Contact Inbox */}
       <div className="space-y-3">

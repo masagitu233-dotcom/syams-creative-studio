@@ -29,6 +29,7 @@ import {
 import { INITIAL_DIGITAL_PRODUCTS, PRODUCT_IMAGES } from '../data/digitalProducts';
 import {
   formatServicePriceLabel,
+  normalizeVisualTheme,
   normalizeWhatsappNumber,
   sanitizeExternalUrl,
   slugify,
@@ -48,6 +49,7 @@ import type {
   PortfolioItem,
   ServiceItem,
   SiteSettings,
+  VisualThemeMode,
 } from '../types/studio';
 import type { MediaUsageReference } from '../utils/studioLogic';
 
@@ -1278,6 +1280,10 @@ export async function saveSiteSettingsByAdmin(
     if (settings.youtubeUrl) payload.youtubeUrl = sanitizeExternalUrl(settings.youtubeUrl).slice(0, 300);
     if (settings.linkedinUrl) payload.linkedinUrl = sanitizeExternalUrl(settings.linkedinUrl).slice(0, 300);
 
+    if (settings.visualTheme) {
+      payload.visualTheme = normalizeVisualTheme(settings.visualTheme);
+    }
+
     if (existing.exists()) {
       const existingData = existing.data() as Partial<SiteSettings>;
       if (typeof existingData.servicesMigrated === 'boolean') {
@@ -1292,6 +1298,9 @@ export async function saveSiteSettingsByAdmin(
       if (typeof existingData.faqsMigrated === 'boolean') {
         payload.faqsMigrated = existingData.faqsMigrated;
       }
+      if (!payload.visualTheme && existingData.visualTheme) {
+        payload.visualTheme = normalizeVisualTheme(existingData.visualTheme);
+      }
       await updateDoc(ref, payload);
     } else {
       await setDoc(ref, payload);
@@ -1305,6 +1314,46 @@ export async function saveSiteSettingsByAdmin(
       entityId: 'general',
       summary: 'Memperbarui konten utama, banner hero, kontak, dan tautan media sosial studio.',
     });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function saveVisualThemeByAdmin(
+  theme: VisualThemeMode,
+  actor: { uid: string; email: string }
+): Promise<VisualThemeMode> {
+  const path = 'site_settings/general';
+  const validTheme = normalizeVisualTheme(theme);
+  try {
+    const ref = doc(db, 'site_settings', 'general');
+    const existing = await getDoc(ref);
+
+    if (existing.exists()) {
+      await updateDoc(ref, {
+        visualTheme: validTheme,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      const { id: _id, ...initialFields } = INITIAL_SITE_SETTINGS;
+      await setDoc(ref, {
+        ...initialFields,
+        visualTheme: validTheme,
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    const themeLabel = validTheme === 'clean_bento' ? 'Clean Bento Grid' : 'Neo Brutalist';
+    await logAdminActivity({
+      actorUid: actor.uid,
+      actorEmail: actor.email,
+      action: 'UPDATE_THEME',
+      entityType: 'site_settings',
+      entityId: 'general',
+      summary: `Menerapkan tema visual global website ke mode "${themeLabel}" (${validTheme}).`,
+    });
+
+    return validTheme;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }

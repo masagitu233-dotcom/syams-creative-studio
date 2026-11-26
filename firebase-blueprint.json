@@ -708,6 +708,11 @@
         "faqsMigrated": {
           "type": "boolean"
         },
+        "visualTheme": {
+          "type": "string",
+          "enum": ["neo_brutalist", "clean_bento"],
+          "description": "Mode tema visual publik website (default: neo_brutalist)."
+        },
         "updatedAt": {
           "type": "string",
           "format": "date-time"

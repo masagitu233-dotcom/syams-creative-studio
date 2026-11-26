@@ -10,6 +10,7 @@ import type {
   ServiceCategory,
   ServiceItem,
   SiteSettings,
+  VisualThemeMode,
 } from '../types/studio';
 
 export const SERVICE_CATEGORY_LABELS: Record<ServiceCategory, string> = {
@@ -913,4 +914,56 @@ export function promoteGalleryItemToPrimary(
     gallery: remaining.slice(0, 12),
   };
 }
+
+// -----------------------------------------------------------------------------
+// Dual Visual Theme Helpers (Pure Presentation Layer)
+// -----------------------------------------------------------------------------
+
+export const DEFAULT_VISUAL_THEME: VisualThemeMode = 'neo_brutalist';
+
+export interface VisualThemeOptionMeta {
+  id: VisualThemeMode;
+  name: string;
+  tagline: string;
+  description: string;
+  traits: string[];
+}
+
+export const VISUAL_THEME_OPTIONS: VisualThemeOptionMeta[] = [
+  {
+    id: 'neo_brutalist',
+    name: 'Neo Brutalist',
+    tagline: 'Tema Bawaan Studio',
+    description:
+      'Gaya ekspresif khas SYAMS CREATIVE STUDIO dengan garis tegas, bayangan offset tajam, dan palet krem-hijau-mustard kontras tinggi.',
+    traits: ['Outline tegas 2px', 'Hard offset shadow', 'Sudut tajam 4px'],
+  },
+  {
+    id: 'clean_bento',
+    name: 'Clean Bento Grid',
+    tagline: 'Minimalis Modern',
+    description:
+      'Tampilan bersih berbasis kartu bento modern dengan sudut lebih halus, garis tipis lembut, dan bayangan elevasi minimal yang tetap nyaman dibaca.',
+    traits: ['Sudut kartu halus', 'Border tipis elegan', 'Bayangan lembut minimal'],
+  },
+];
+
+export function isValidVisualTheme(value: unknown): value is VisualThemeMode {
+  return value === 'neo_brutalist' || value === 'clean_bento';
+}
+
+export function normalizeVisualTheme(value: unknown): VisualThemeMode {
+  return isValidVisualTheme(value) ? value : DEFAULT_VISUAL_THEME;
+}
+
+export function resolveEffectiveVisualTheme(
+  persistedTheme: unknown,
+  previewTheme: VisualThemeMode | null
+): VisualThemeMode {
+  if (previewTheme && isValidVisualTheme(previewTheme)) {
+    return previewTheme;
+  }
+  return normalizeVisualTheme(persistedTheme);
+}
+
 

@@ -81,4 +81,25 @@ test('Drive folders cache is strictly admin-only and media/gallery validation is
   );
 });
 
+test('Site settings allows optional visualTheme enum with public get and strict admin-only mutations', () => {
+  assert.match(
+    rulesSource,
+    /function isValidOptionalVisualTheme\(data\)\s*\{\s*return !\('visualTheme' in data\) \|\| data\.visualTheme in \['neo_brutalist', 'clean_bento'\];\s*\}/
+  );
+  assert.match(
+    rulesSource,
+    /function isValidSiteSettings\(data\)[\s\S]*?'visualTheme', 'updatedAt'[\s\S]*?isValidOptionalVisualTheme\(data\)/
+  );
+  assert.match(
+    rulesSource,
+    /match \/site_settings\/\{settingId\}[\s\S]*?allow get: if isValidId\(settingId\);[\s\S]*?allow list: if false;[\s\S]*?allow create: if isVerifiedUser\(\) && isValidId\(settingId\) && isValidSiteSettings\(incoming\(\)\)[\s\S]*?isAdmin\(\);[\s\S]*?allow update: if isVerifiedUser\(\) && isValidId\(settingId\) && isValidSiteSettings\(incoming\(\)\)[\s\S]*?isAdmin\(\)[\s\S]*?'visualTheme', 'updatedAt'[\s\S]*?allow delete: if false;/
+  );
+  assert.deepEqual(blueprint.entities.SiteSettings.properties.visualTheme.enum, [
+    'neo_brutalist',
+    'clean_bento',
+  ]);
+  assert.ok(!blueprint.entities.SiteSettings.required.includes('visualTheme'));
+});
+
+
 

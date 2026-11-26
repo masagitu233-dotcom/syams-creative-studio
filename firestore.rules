@@ -286,6 +286,10 @@ service cloud.firestore {
         data.updatedAt is timestamp;
     }
 
+    function isValidOptionalVisualTheme(data) {
+      return !('visualTheme' in data) || data.visualTheme in ['neo_brutalist', 'clean_bento'];
+    }
+
     function isValidSiteSettings(data) {
       return data.keys().hasAll([
           'studioName', 'slogan', 'heroHeadline', 'heroSubheadline', 'aboutSummary',
@@ -296,7 +300,7 @@ service cloud.firestore {
           'heroDriveFileId', 'aboutSummary', 'aboutMission', 'whatsappNumber', 'email',
           'address', 'operatingHours', 'instagramUrl', 'tiktokUrl', 'youtubeUrl',
           'linkedinUrl', 'servicesMigrated', 'productsMigrated', 'portfolioMigrated',
-          'faqsMigrated', 'updatedAt'
+          'faqsMigrated', 'visualTheme', 'updatedAt'
         ]) &&
         data.studioName is string && data.studioName.size() >= 2 && data.studioName.size() <= 100 &&
         data.slogan is string && data.slogan.size() >= 3 && data.slogan.size() <= 160 &&
@@ -318,6 +322,7 @@ service cloud.firestore {
         isValidOptionalBool(data, 'productsMigrated') &&
         isValidOptionalBool(data, 'portfolioMigrated') &&
         isValidOptionalBool(data, 'faqsMigrated') &&
+        isValidOptionalVisualTheme(data) &&
         data.updatedAt is timestamp;
     }
 
@@ -577,7 +582,7 @@ service cloud.firestore {
           'heroDriveFileId', 'aboutSummary', 'aboutMission', 'whatsappNumber', 'email',
           'address', 'operatingHours', 'instagramUrl', 'tiktokUrl', 'youtubeUrl',
           'linkedinUrl', 'servicesMigrated', 'productsMigrated', 'portfolioMigrated',
-          'faqsMigrated', 'updatedAt'
+          'faqsMigrated', 'visualTheme', 'updatedAt'
         ]);
       allow delete: if false;
     }

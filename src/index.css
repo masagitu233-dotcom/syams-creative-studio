@@ -345,6 +345,311 @@
   }
 }
 
+/* ============================================================================
+   Clean Bento Grid Visual Theme (Presentation Layer Only)
+   Strictly scoped to html[data-theme="clean_bento"].
+   Zero changes to layout, grid columns, positions, sizes, or ordering.
+   Neo Brutalist (default / html[data-theme="neo_brutalist"]) remains untouched.
+   ============================================================================ */
+
+html[data-theme="clean_bento"] {
+  --bento-canvas: #F4F5F1;
+  --bento-surface: #FFFFFF;
+  --bento-surface-muted: #EDF1EC;
+  --bento-surface-warm: #F7F6EE;
+  --bento-border: rgba(15, 61, 58, 0.11);
+  --bento-border-strong: rgba(15, 61, 58, 0.2);
+  --bento-shadow-sm: 0 1px 2px rgba(15, 61, 58, 0.04), 0 4px 12px -6px rgba(15, 61, 58, 0.08);
+  --bento-shadow: 0 1px 2px rgba(15, 61, 58, 0.04), 0 8px 22px -12px rgba(15, 61, 58, 0.11);
+  --bento-shadow-hover: 0 4px 10px -2px rgba(15, 61, 58, 0.06), 0 16px 30px -14px rgba(15, 61, 58, 0.16);
+  --bento-shadow-lg: 0 14px 40px -10px rgba(15, 61, 58, 0.2), 0 2px 8px rgba(15, 61, 58, 0.06);
+  background-color: var(--bento-canvas);
+  color: #181C1B;
+}
+
+html[data-theme="clean_bento"] body {
+  background-color: var(--bento-canvas);
+  color: #181C1B;
+}
+
+/* Soft ambient hero backdrop instead of Neo-Brutalist graph grid */
+html[data-theme="clean_bento"] .nb-grid-pattern {
+  background-color: var(--bento-canvas);
+  background-image:
+    radial-gradient(circle at 10% 10%, rgba(138, 204, 213, 0.2), transparent 44%),
+    radial-gradient(circle at 88% 12%, rgba(243, 201, 91, 0.16), transparent 40%);
+  background-size: auto;
+}
+
+/* Sticky public header & footer refinement */
+html[data-theme="clean_bento"] header.sticky {
+  background-color: rgba(244, 245, 241, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom-width: 1px;
+  border-bottom-color: var(--bento-border);
+  box-shadow: 0 1px 14px -6px rgba(15, 61, 58, 0.09);
+}
+
+html[data-theme="clean_bento"] footer {
+  border-top-width: 1px;
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Bento surface cards */
+html[data-theme="clean_bento"] .nb-card,
+html[data-theme="clean_bento"] .nb-card-cream,
+html[data-theme="clean_bento"] .nb-card-interactive {
+  border-width: 1px;
+  border-color: var(--bento-border);
+  border-radius: 14px;
+  box-shadow: var(--bento-shadow);
+}
+
+html[data-theme="clean_bento"] .nb-card-cream {
+  background-color: var(--bento-surface-muted);
+}
+
+html[data-theme="clean_bento"] .nb-card-interactive {
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms ease;
+}
+
+html[data-theme="clean_bento"] .nb-card-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--bento-border-strong);
+  box-shadow: var(--bento-shadow-hover);
+}
+
+/* Replace hard brutalist offset shadows & 2px black outlines */
+html[data-theme="clean_bento"] .nb-border {
+  border-width: 1px;
+  border-color: var(--bento-border);
+}
+
+html[data-theme="clean_bento"] .nb-shadow {
+  box-shadow: var(--bento-shadow);
+}
+
+html[data-theme="clean_bento"] .nb-shadow-sm {
+  box-shadow: var(--bento-shadow-sm);
+}
+
+html[data-theme="clean_bento"] .nb-shadow-lg {
+  box-shadow: var(--bento-shadow-lg);
+}
+
+/* Clean Bento Buttons */
+html[data-theme="clean_bento"] .nb-btn {
+  border-width: 1px;
+  border-color: rgba(15, 61, 58, 0.14);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(15, 61, 58, 0.06);
+  transition:
+    transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+html[data-theme="clean_bento"] .nb-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -6px rgba(15, 61, 58, 0.22);
+}
+
+html[data-theme="clean_bento"] .nb-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(15, 61, 58, 0.08);
+}
+
+html[data-theme="clean_bento"] .nb-btn-primary {
+  background-color: #0F3D3A;
+  color: #FFFFFF;
+  border-color: #0F3D3A;
+}
+
+html[data-theme="clean_bento"] .nb-btn-primary:hover:not(:disabled) {
+  background-color: #14504C;
+  border-color: #14504C;
+}
+
+html[data-theme="clean_bento"] .nb-btn-mustard {
+  background-color: #F4D26F;
+  color: #171717;
+  border-color: rgba(15, 61, 58, 0.12);
+}
+
+html[data-theme="clean_bento"] .nb-btn-mustard:hover:not(:disabled) {
+  background-color: #F7DD8F;
+}
+
+html[data-theme="clean_bento"] .nb-btn-burgundy {
+  background-color: #6C151E;
+  color: #FFFFFF;
+  border-color: #6C151E;
+}
+
+html[data-theme="clean_bento"] .nb-btn-sky {
+  background-color: #CEE9EC;
+  color: #0F3D3A;
+  border-color: rgba(15, 61, 58, 0.12);
+}
+
+html[data-theme="clean_bento"] .nb-btn-sky:hover:not(:disabled) {
+  background-color: #BEE1E5;
+}
+
+html[data-theme="clean_bento"] .nb-btn-surface {
+  background-color: #FFFFFF;
+  color: #181C1B;
+  border-color: rgba(15, 61, 58, 0.14);
+}
+
+html[data-theme="clean_bento"] .nb-btn-surface:hover:not(:disabled) {
+  background-color: #EDF1EC;
+  border-color: rgba(15, 61, 58, 0.22);
+}
+
+/* Clean Bento Filter Tabs */
+html[data-theme="clean_bento"] .nb-tab {
+  border-width: 1px;
+  border-color: var(--bento-border);
+  border-radius: 9px;
+  background-color: #FFFFFF;
+  color: #2B3331;
+  box-shadow: 0 1px 2px rgba(15, 61, 58, 0.03);
+}
+
+html[data-theme="clean_bento"] .nb-tab:hover {
+  background-color: var(--bento-surface-muted);
+  border-color: var(--bento-border-strong);
+}
+
+html[data-theme="clean_bento"] .nb-tab[aria-selected="true"],
+html[data-theme="clean_bento"] .nb-tab-active {
+  background-color: #0F3D3A;
+  color: #FFFFFF;
+  border-color: #0F3D3A;
+  box-shadow: 0 4px 10px -4px rgba(15, 61, 58, 0.35);
+}
+
+html[data-theme="clean_bento"] .nb-tab[aria-selected="true"]:hover,
+html[data-theme="clean_bento"] .nb-tab-active:hover {
+  background-color: #14504C;
+}
+
+/* Clean Bento Inputs & Selects */
+html[data-theme="clean_bento"] .nb-input {
+  border-width: 1px;
+  border-color: rgba(15, 61, 58, 0.18);
+  border-radius: 10px;
+  background-color: #FFFFFF;
+  box-shadow: inset 0 1px 2px rgba(15, 61, 58, 0.03);
+}
+
+html[data-theme="clean_bento"] .nb-input:focus {
+  border-color: #0F3D3A;
+  box-shadow: 0 0 0 3px rgba(15, 61, 58, 0.12);
+}
+
+/* Clean Bento Harmonization for Utility-Styled Elements (excluding isolated theme mini-previews) */
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).bg-\[\#F8F8E1\] {
+  background-color: var(--bento-canvas);
+}
+
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).bg-\[\#F1F1D3\] {
+  background-color: #EAECE6;
+}
+
+html[data-theme="clean_bento"] section.bg-\[\#8ACCD5\]\/20 {
+  background-color: #EBF2F2;
+}
+
+html[data-theme="clean_bento"] section.bg-\[\#F3C95B\] {
+  background-color: #E7EEE9;
+}
+
+html[data-theme="clean_bento"] .bg-\[\#F3C95B\]\/45 {
+  background-color: #FAF3D8;
+}
+
+html[data-theme="clean_bento"] .bg-\[\#8ACCD5\]\/40,
+html[data-theme="clean_bento"] .bg-\[\#8ACCD5\]\/35 {
+  background-color: #E4F2F4;
+}
+
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).border-\[\#171717\] {
+  border-color: var(--bento-border);
+}
+
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).border-2.border-\[\#171717\] {
+  border-width: 1px;
+  border-color: var(--bento-border);
+}
+
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).border-b-2.border-\[\#171717\] {
+  border-bottom-width: 1px;
+  border-bottom-color: var(--bento-border);
+}
+
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).border-t-2.border-\[\#171717\] {
+  border-top-width: 1px;
+  border-top-color: var(--bento-border);
+}
+
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).border-l-2.border-\[\#171717\] {
+  border-left-width: 1px;
+  border-left-color: var(--bento-border);
+}
+
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).border-r-2.border-\[\#171717\] {
+  border-right-width: 1px;
+  border-right-color: var(--bento-border);
+}
+
+@media (min-width: 1024px) {
+  html[data-theme="clean_bento"] .lg\:border-l-2.border-\[\#171717\] {
+    border-left-width: 1px;
+    border-left-color: var(--bento-border);
+  }
+
+  html[data-theme="clean_bento"] .lg\:border-r-2.border-\[\#171717\] {
+    border-right-width: 1px;
+    border-right-color: var(--bento-border);
+  }
+}
+
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).rounded-\[4px\] {
+  border-radius: 12px;
+}
+
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).rounded-\[2px\] {
+  border-radius: 8px;
+}
+
+/* Soften sharp square step, icon, and checklist badges in Clean Bento mode */
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).w-8.h-8.border-2,
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).w-9.h-9.border-2,
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).w-10.h-10.border-2 {
+  border-radius: 10px;
+}
+
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).w-4.h-4.border-2,
+html[data-theme="clean_bento"] :not(.theme-preview-isolated):not(.theme-preview-isolated *).w-5.h-5.border-2 {
+  border-radius: 5px;
+}
+
+/* Soft modal backdrop blur */
+html[data-theme="clean_bento"] .bg-\[\#171717\]\/70,
+html[data-theme="clean_bento"] .bg-\[\#171717\]\/65,
+html[data-theme="clean_bento"] .bg-\[\#171717\]\/80 {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

@@ -5,6 +5,7 @@ import {
   buildProductWhatsappMessage,
   computeCatalogStats,
   computeOrderStats,
+  DEFAULT_VISUAL_THEME,
   filterAndSortOrders,
   filterDigitalProducts,
   findMediaUsages,
@@ -12,17 +13,21 @@ import {
   formatServicePriceLabel,
   generateOrderCode,
   getProductGridColsClass,
+  isValidVisualTheme,
   isValidWhatsappNumber,
   isVideoMimeType,
+  normalizeVisualTheme,
   normalizeWhatsappNumber,
   promoteGalleryItemToPrimary,
   reorderGalleryItems,
+  resolveEffectiveVisualTheme,
   sanitizeExternalUrl,
   validateContactInput,
   validateDigitalProductInput,
   validateMediaFileBeforeUpload,
   validateOrderInput,
   validateServiceInput,
+  VISUAL_THEME_OPTIONS,
 } from './studioLogic';
 import type { DigitalProductItem, OrderItem } from '../types/studio';
 
@@ -473,5 +478,30 @@ test('reorderGalleryItems and promoteGalleryItemToPrimary preserve data integrit
   assert.ok(promoted.gallery.some((g) => g.fileId === 'orig_1'));
   assert.ok(!promoted.gallery.some((g) => g.fileId === 'file_c'));
 });
+
+test('visual theme helpers validate enum, default to neo_brutalist, and prioritize preview mode', () => {
+  assert.equal(DEFAULT_VISUAL_THEME, 'neo_brutalist');
+  assert.deepEqual(
+    VISUAL_THEME_OPTIONS.map((o) => o.id),
+    ['neo_brutalist', 'clean_bento']
+  );
+
+  assert.equal(isValidVisualTheme('neo_brutalist'), true);
+  assert.equal(isValidVisualTheme('clean_bento'), true);
+  assert.equal(isValidVisualTheme('dark_mode'), false);
+  assert.equal(isValidVisualTheme(''), false);
+  assert.equal(isValidVisualTheme(undefined), false);
+
+  assert.equal(normalizeVisualTheme(undefined), 'neo_brutalist');
+  assert.equal(normalizeVisualTheme(null), 'neo_brutalist');
+  assert.equal(normalizeVisualTheme('unknown_theme'), 'neo_brutalist');
+  assert.equal(normalizeVisualTheme('clean_bento'), 'clean_bento');
+
+  assert.equal(resolveEffectiveVisualTheme(undefined, null), 'neo_brutalist');
+  assert.equal(resolveEffectiveVisualTheme('clean_bento', null), 'clean_bento');
+  assert.equal(resolveEffectiveVisualTheme('neo_brutalist', 'clean_bento'), 'clean_bento');
+  assert.equal(resolveEffectiveVisualTheme('clean_bento', 'neo_brutalist'), 'neo_brutalist');
+});
+
 
 

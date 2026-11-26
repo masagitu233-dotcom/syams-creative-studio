@@ -147,6 +147,8 @@ export interface MediaAsset {
   updatedAt?: unknown;
 }
 
+export type VisualThemeMode = 'neo_brutalist' | 'clean_bento';
+
 export interface SiteSettings {
   id?: string;
   studioName: string;
@@ -169,6 +171,7 @@ export interface SiteSettings {
   productsMigrated?: boolean;
   portfolioMigrated?: boolean;
   faqsMigrated?: boolean;
+  visualTheme?: VisualThemeMode;
   updatedAt?: unknown;
 }
 
