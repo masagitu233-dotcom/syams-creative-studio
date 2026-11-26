@@ -122,7 +122,7 @@ export default function App() {
                     </PublicLayout>
                   }
                 />
-                <Route path="/admin" element={<AdminDashboardPage />} />
+                <Route path="/admin/*" element={<AdminDashboardPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </BrowserRouter>

@@ -5,13 +5,16 @@ import {
   INITIAL_SERVICES,
   INITIAL_SITE_SETTINGS,
 } from '../data/initialCatalog';
+import { INITIAL_DIGITAL_PRODUCTS } from '../data/digitalProducts';
 import {
+  subscribePublicDigitalProducts,
   subscribePublicFaqs,
   subscribePublicPortfolio,
   subscribePublicServices,
   subscribeSiteSettings,
 } from '../services/firestoreService';
 import type {
+  DigitalProductItem,
   FaqItem,
   PortfolioItem,
   ServiceItem,
@@ -21,13 +24,16 @@ import type {
 
 interface StudioDataContextValue {
   services: ServiceItem[];
+  products: DigitalProductItem[];
   portfolio: PortfolioItem[];
   faqs: FaqItem[];
   siteSettings: SiteSettings;
   loadingServices: boolean;
+  loadingProducts: boolean;
   loadingPortfolio: boolean;
   loadingFaqs: boolean;
   isCatalogSyncedToFirestore: boolean;
+  isProductsSyncedToFirestore: boolean;
   dataError: string | null;
   toasts: ToastNotice[];
   pushToast: (toast: Omit<ToastNotice, 'id'>) => void;
@@ -38,11 +44,13 @@ const StudioDataContext = createContext<StudioDataContextValue | null>(null);
 
 export function StudioDataProvider({ children }: { children: React.ReactNode }) {
   const [liveServices, setLiveServices] = useState<ServiceItem[] | null>(null);
+  const [liveProducts, setLiveProducts] = useState<DigitalProductItem[] | null>(null);
   const [livePortfolio, setLivePortfolio] = useState<PortfolioItem[] | null>(null);
   const [liveFaqs, setLiveFaqs] = useState<FaqItem[] | null>(null);
   const [liveSettings, setLiveSettings] = useState<SiteSettings | null>(null);
 
   const [loadingServices, setLoadingServices] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
   const [loadingFaqs, setLoadingFaqs] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -57,6 +65,16 @@ export function StudioDataProvider({ children }: { children: React.ReactNode }) 
       () => {
         setLoadingServices(false);
         setDataError('Sebagian data katalog sedang menggunakan mode pratinjau katalog awal.');
+      }
+    );
+
+    const unsubProducts = subscribePublicDigitalProducts(
+      (items) => {
+        setLiveProducts(items);
+        setLoadingProducts(false);
+      },
+      () => {
+        setLoadingProducts(false);
       }
     );
 
@@ -91,6 +109,7 @@ export function StudioDataProvider({ children }: { children: React.ReactNode }) 
 
     return () => {
       unsubServices();
+      unsubProducts();
       unsubPortfolio();
       unsubFaqs();
       unsubSettings();
@@ -109,23 +128,37 @@ export function StudioDataProvider({ children }: { children: React.ReactNode }) 
     setToasts((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
-  const hasLiveServices = Boolean(liveServices && liveServices.length > 0);
-  const services = hasLiveServices ? liveServices! : INITIAL_SERVICES;
-  const portfolio = livePortfolio && livePortfolio.length > 0 ? livePortfolio : INITIAL_PORTFOLIO;
-  const faqs = liveFaqs && liveFaqs.length > 0 ? liveFaqs : INITIAL_FAQS;
+  // Once migrated to Firestore (or once Firestore documents exist), read strictly from Firestore
+  // so drafting or deleting items in Admin is reflected immediately without static fallback.
+  const isServicesLive =
+    Boolean(liveSettings?.servicesMigrated) || (liveServices !== null && liveServices.length > 0);
+  const isProductsLive =
+    Boolean(liveSettings?.productsMigrated) || (liveProducts !== null && liveProducts.length > 0);
+  const isPortfolioLive =
+    Boolean(liveSettings?.portfolioMigrated) || (livePortfolio !== null && livePortfolio.length > 0);
+  const isFaqsLive =
+    Boolean(liveSettings?.faqsMigrated) || (liveFaqs !== null && liveFaqs.length > 0);
+
+  const services = isServicesLive ? liveServices ?? [] : INITIAL_SERVICES;
+  const products = isProductsLive ? liveProducts ?? [] : INITIAL_DIGITAL_PRODUCTS;
+  const portfolio = isPortfolioLive ? livePortfolio ?? [] : INITIAL_PORTFOLIO;
+  const faqs = isFaqsLive ? liveFaqs ?? [] : INITIAL_FAQS;
   const siteSettings = liveSettings ?? INITIAL_SITE_SETTINGS;
 
   return (
     <StudioDataContext.Provider
       value={{
         services,
+        products,
         portfolio,
         faqs,
         siteSettings,
         loadingServices,
+        loadingProducts,
         loadingPortfolio,
         loadingFaqs,
-        isCatalogSyncedToFirestore: hasLiveServices,
+        isCatalogSyncedToFirestore: isServicesLive,
+        isProductsSyncedToFirestore: isProductsLive,
         dataError,
         toasts,
         pushToast,

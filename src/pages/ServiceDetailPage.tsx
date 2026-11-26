@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Clock, ShieldCheck } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
 import { StudioImage } from '../components/StudioImage';
+import { MediaGallerySection } from '../components/MediaGallerySection';
 import { ServiceCard } from '../components/ServiceCard';
 import { SectionHeader } from '../components/SectionHeader';
 import { CATALOG_GRID_COLS_CLASS, SERVICE_CATEGORY_LABELS } from '../utils/studioLogic';
@@ -166,6 +167,16 @@ export function ServiceDetailPage() {
             </ul>
           </div>
         </div>
+
+        {/* Photo & Video Documentation Gallery */}
+        {service.gallery && service.gallery.length > 0 && (
+          <section className="nb-card p-4 sm:p-5">
+            <MediaGallerySection
+              items={service.gallery}
+              title="Galeri Dokumentasi Layanan"
+            />
+          </section>
+        )}
 
         {/* Related Services */}
         {otherServices.length > 0 && (

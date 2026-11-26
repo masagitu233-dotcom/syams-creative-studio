@@ -1,27 +1,32 @@
-interface NetlifyResponse {
-  statusCode: number;
-  headers?: Record<string, string>;
-  body: string;
-}
+import {
+  CATEGORY_FOLDER_NAMES,
+  STUDIO_ROOT_FOLDER_NAME,
+  getDriveConfig,
+  type NetlifyEvent,
+  type NetlifyResponse,
+} from './_driveShared';
 
-export async function handler(): Promise<NetlifyResponse> {
-  const configured = Boolean(
-    process.env.GOOGLE_DRIVE_CLIENT_ID &&
-      process.env.GOOGLE_DRIVE_CLIENT_SECRET &&
-      process.env.GOOGLE_DRIVE_REFRESH_TOKEN
-  );
+export async function handler(event: NetlifyEvent): Promise<NetlifyResponse> {
+  if (event.httpMethod !== 'GET') {
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed.' }) };
+  }
+
+  const cfg = getDriveConfig();
 
   return {
     statusCode: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     body: JSON.stringify({
-      configured,
-      hasPublicFolder: Boolean(process.env.GOOGLE_DRIVE_PUBLIC_FOLDER_ID),
-      hasPrivateFolder: Boolean(process.env.GOOGLE_DRIVE_PRIVATE_FOLDER_ID),
-      mode: configured ? 'live_google_drive' : 'unconfigured',
-      message: configured
-        ? 'Google Drive API aktif pada Netlify Functions.'
-        : 'Kredensial Google Drive belum diatur pada environment variables Netlify.',
+      configured: cfg.configured,
+      hasPublicFolder: Boolean(cfg.publicFolderId),
+      hasPrivateFolder: Boolean(cfg.privateFolderId),
+      hasRootFolderEnv: Boolean(cfg.rootFolderId),
+      rootFolderName: STUDIO_ROOT_FOLDER_NAME,
+      categoryFolders: CATEGORY_FOLDER_NAMES,
+      mode: cfg.configured ? 'live_google_drive' : 'unconfigured',
+      message: cfg.configured
+        ? 'Google Drive API aktif dan siap mengelola struktur folder serta media SYAMS CREATIVE STUDIO.'
+        : 'Variabel GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, dan GOOGLE_DRIVE_REFRESH_TOKEN belum diisi pada Netlify Environment Variables.',
     }),
   };
-}
+};

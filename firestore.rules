@@ -44,6 +44,37 @@ service cloud.firestore {
       return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
     }
 
+    function isValidOptionalBool(data, field) {
+      return !(field in data) || data[field] is bool;
+    }
+
+    function isValidOptionalTimestamp(data, field) {
+      return !(field in data) || data[field] is timestamp;
+    }
+
+    function isValidOptionalGallery(data) {
+      return !('gallery' in data) || (
+        data.gallery is list &&
+        data.gallery.size() <= 12 &&
+        (
+          data.gallery.size() == 0 || (
+            data.gallery[0] is map &&
+            data.gallery[0].keys().hasAll(['fileId', 'fileName', 'mimeType']) &&
+            data.gallery[0].keys().hasOnly(['fileId', 'fileName', 'mimeType', 'caption', 'imageUrl']) &&
+            data.gallery[0].fileId is string &&
+            data.gallery[0].fileId.size() >= 3 &&
+            data.gallery[0].fileId.size() <= 200 &&
+            data.gallery[0].fileName is string &&
+            data.gallery[0].fileName.size() >= 1 &&
+            data.gallery[0].fileName.size() <= 200 &&
+            data.gallery[0].mimeType is string &&
+            data.gallery[0].mimeType.size() >= 3 &&
+            data.gallery[0].mimeType.size() <= 100
+          )
+        )
+      );
+    }
+
     // -------------------------------------------------------------------------
     // Entity Validation Blueprints (Pillar 2 & Pillar 5)
     // -------------------------------------------------------------------------
@@ -79,7 +110,7 @@ service cloud.firestore {
         data.keys().hasOnly([
           'slug', 'title', 'category', 'shortDescription', 'fullDescription',
           'priceMin', 'priceMax', 'priceUnit', 'priceLabel', 'estimatedTurnaround',
-          'deliverables', 'accentColor', 'imageUrl', 'driveFileId', 'sortOrder',
+          'deliverables', 'accentColor', 'imageUrl', 'driveFileId', 'gallery', 'sortOrder',
           'isFeatured', 'isPublished', 'createdAt', 'updatedAt'
         ]) &&
         data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 80 && data.slug.matches('^[a-z0-9\\-]+$') &&
@@ -97,9 +128,45 @@ service cloud.firestore {
         data.accentColor in ['#0F3D3A', '#6C151E', '#8ACCD5', '#F3C95B'] &&
         data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 500 &&
         isValidOptionalString(data, 'driveFileId', 200) &&
+        isValidOptionalGallery(data) &&
         data.sortOrder is number && data.sortOrder >= 0 && data.sortOrder <= 9999 &&
         data.isFeatured is bool &&
         data.isPublished is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidDigitalProduct(data) {
+      return data.keys().hasAll([
+          'slug', 'title', 'category', 'price', 'showPrice', 'format',
+          'fileSize', 'compatibility', 'summary', 'description', 'includes',
+          'imageUrl', 'isFeatured', 'isPublished', 'sortOrder',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'slug', 'title', 'category', 'price', 'showPrice', 'format',
+          'fileSize', 'compatibility', 'summary', 'description', 'includes',
+          'imageUrl', 'driveFileId', 'gallery', 'isFeatured', 'isPublished', 'sortOrder',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 80 && data.slug.matches('^[a-z0-9\\-]+$') &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 140 &&
+        data.category in ['template_ppt', 'template_poster', 'ui_web_kit', 'aset_video', 'naskah_siap_pakai'] &&
+        data.price is number && data.price >= 0 && data.price <= 1000000000 &&
+        data.showPrice is bool &&
+        data.format is string && data.format.size() >= 1 && data.format.size() <= 80 &&
+        data.fileSize is string && data.fileSize.size() <= 40 &&
+        data.compatibility is string && data.compatibility.size() <= 160 &&
+        data.summary is string && data.summary.size() >= 5 && data.summary.size() <= 320 &&
+        data.description is string && data.description.size() >= 10 && data.description.size() <= 3000 &&
+        data.includes is list && data.includes.size() >= 1 && data.includes.size() <= 15 &&
+        data.includes[0] is string && data.includes[0].size() <= 200 &&
+        data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 500 &&
+        isValidOptionalString(data, 'driveFileId', 200) &&
+        isValidOptionalGallery(data) &&
+        data.isFeatured is bool &&
+        data.isPublished is bool &&
+        data.sortOrder is number && data.sortOrder >= 0 && data.sortOrder <= 9999 &&
         data.createdAt is timestamp &&
         data.updatedAt is timestamp;
     }
@@ -151,7 +218,7 @@ service cloud.firestore {
         ]) &&
         data.keys().hasOnly([
           'title', 'clientName', 'category', 'year', 'summary', 'challenge',
-          'outcome', 'metrics', 'imageUrl', 'driveFileId', 'projectUrl',
+          'outcome', 'metrics', 'imageUrl', 'driveFileId', 'gallery', 'projectUrl',
           'isFeatured', 'isPublished', 'sortOrder', 'createdAt', 'updatedAt'
         ]) &&
         data.title is string && data.title.size() >= 3 && data.title.size() <= 140 &&
@@ -164,6 +231,7 @@ service cloud.firestore {
         data.metrics is string && data.metrics.size() >= 2 && data.metrics.size() <= 120 &&
         data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 500 &&
         isValidOptionalString(data, 'driveFileId', 200) &&
+        isValidOptionalGallery(data) &&
         isValidOptionalString(data, 'projectUrl', 500) &&
         data.isFeatured is bool &&
         data.isPublished is bool &&
@@ -179,17 +247,43 @@ service cloud.firestore {
         ]) &&
         data.keys().hasOnly([
           'fileId', 'fileName', 'mimeType', 'sizeBytes', 'visibility',
-          'usage', 'altText', 'ownerUid', 'createdAt'
+          'usage', 'altText', 'folderId', 'folderPath', 'entityType',
+          'entityId', 'entityName', 'isPublished', 'ownerUid', 'createdAt', 'updatedAt'
         ]) &&
         data.fileId is string && data.fileId.size() >= 3 && data.fileId.size() <= 200 &&
         data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 200 &&
         data.mimeType is string && data.mimeType.size() >= 3 && data.mimeType.size() <= 100 &&
         data.sizeBytes is number && data.sizeBytes >= 0 && data.sizeBytes <= 104857600 &&
         data.visibility in ['public', 'private'] &&
-        data.usage in ['service', 'portfolio', 'hero', 'order_attachment', 'other'] &&
+        data.usage in ['service', 'product', 'portfolio', 'hero', 'order_attachment', 'other'] &&
         isValidOptionalString(data, 'altText', 240) &&
+        isValidOptionalString(data, 'folderId', 200) &&
+        isValidOptionalString(data, 'folderPath', 260) &&
+        (!('entityType' in data) || data.entityType in ['product', 'service', 'portfolio', 'hero', 'none']) &&
+        isValidOptionalString(data, 'entityId', 128) &&
+        isValidOptionalString(data, 'entityName', 140) &&
+        isValidOptionalBool(data, 'isPublished') &&
         isValidId(data.ownerUid) &&
-        data.createdAt is timestamp;
+        data.createdAt is timestamp &&
+        isValidOptionalTimestamp(data, 'updatedAt');
+    }
+
+    function isValidDriveFolder(data) {
+      return data.keys().hasAll([
+          'folderKey', 'folderId', 'folderName', 'category', 'folderPath', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'folderKey', 'folderId', 'folderName', 'parentFolderId', 'category',
+          'entityId', 'folderPath', 'updatedAt'
+        ]) &&
+        isValidId(data.folderKey) &&
+        data.folderId is string && data.folderId.size() >= 3 && data.folderId.size() <= 200 &&
+        data.folderName is string && data.folderName.size() >= 1 && data.folderName.size() <= 160 &&
+        isValidOptionalString(data, 'parentFolderId', 200) &&
+        data.category in ['root', 'service', 'product', 'portfolio', 'hero', 'order_attachment', 'other'] &&
+        isValidOptionalString(data, 'entityId', 128) &&
+        data.folderPath is string && data.folderPath.size() >= 1 && data.folderPath.size() <= 260 &&
+        data.updatedAt is timestamp;
     }
 
     function isValidSiteSettings(data) {
@@ -198,14 +292,18 @@ service cloud.firestore {
           'whatsappNumber', 'email', 'address', 'operatingHours', 'updatedAt'
         ]) &&
         data.keys().hasOnly([
-          'studioName', 'slogan', 'heroHeadline', 'heroSubheadline', 'aboutSummary',
-          'aboutMission', 'whatsappNumber', 'email', 'address', 'operatingHours',
-          'instagramUrl', 'tiktokUrl', 'youtubeUrl', 'linkedinUrl', 'updatedAt'
+          'studioName', 'slogan', 'heroHeadline', 'heroSubheadline', 'heroImageUrl',
+          'heroDriveFileId', 'aboutSummary', 'aboutMission', 'whatsappNumber', 'email',
+          'address', 'operatingHours', 'instagramUrl', 'tiktokUrl', 'youtubeUrl',
+          'linkedinUrl', 'servicesMigrated', 'productsMigrated', 'portfolioMigrated',
+          'faqsMigrated', 'updatedAt'
         ]) &&
         data.studioName is string && data.studioName.size() >= 2 && data.studioName.size() <= 100 &&
         data.slogan is string && data.slogan.size() >= 3 && data.slogan.size() <= 160 &&
         data.heroHeadline is string && data.heroHeadline.size() >= 5 && data.heroHeadline.size() <= 200 &&
         data.heroSubheadline is string && data.heroSubheadline.size() >= 10 && data.heroSubheadline.size() <= 500 &&
+        isValidOptionalString(data, 'heroImageUrl', 500) &&
+        isValidOptionalString(data, 'heroDriveFileId', 200) &&
         data.aboutSummary is string && data.aboutSummary.size() >= 10 && data.aboutSummary.size() <= 1500 &&
         isValidOptionalString(data, 'aboutMission', 1200) &&
         data.whatsappNumber is string && data.whatsappNumber.size() >= 8 && data.whatsappNumber.size() <= 30 &&
@@ -216,6 +314,10 @@ service cloud.firestore {
         isValidOptionalString(data, 'tiktokUrl', 300) &&
         isValidOptionalString(data, 'youtubeUrl', 300) &&
         isValidOptionalString(data, 'linkedinUrl', 300) &&
+        isValidOptionalBool(data, 'servicesMigrated') &&
+        isValidOptionalBool(data, 'productsMigrated') &&
+        isValidOptionalBool(data, 'portfolioMigrated') &&
+        isValidOptionalBool(data, 'faqsMigrated') &&
         data.updatedAt is timestamp;
     }
 
@@ -245,7 +347,7 @@ service cloud.firestore {
         isValidId(data.actorUid) &&
         data.actorEmail is string && data.actorEmail.size() >= 5 && data.actorEmail.size() <= 200 &&
         data.action is string && data.action.size() >= 2 && data.action.size() <= 80 &&
-        data.entityType in ['order', 'service', 'portfolio', 'media', 'faq', 'site_settings', 'admin', 'contact'] &&
+        data.entityType in ['order', 'service', 'product', 'portfolio', 'media', 'faq', 'site_settings', 'admin', 'contact'] &&
         data.entityId is string && data.entityId.size() >= 1 && data.entityId.size() <= 128 &&
         data.summary is string && data.summary.size() >= 3 && data.summary.size() <= 400 &&
         data.createdAt is timestamp;
@@ -327,10 +429,31 @@ service cloud.firestore {
         incoming().diff(existing()).affectedKeys().hasOnly([
           'slug', 'title', 'category', 'shortDescription', 'fullDescription',
           'priceMin', 'priceMax', 'priceUnit', 'priceLabel', 'estimatedTurnaround',
-          'deliverables', 'accentColor', 'imageUrl', 'driveFileId', 'sortOrder',
+          'deliverables', 'accentColor', 'imageUrl', 'driveFileId', 'gallery', 'sortOrder',
           'isFeatured', 'isPublished', 'updatedAt'
         ]);
       allow delete: if isVerifiedUser() && isValidId(serviceId) && isAdmin();
+    }
+
+    // 3b. Digital Products (Managed by Admin; public reads published only)
+    match /digital_products/{productId} {
+      allow get: if isValidId(productId) && (existing().isPublished == true || isAdmin());
+      allow list: if resource.data.isPublished == true || isAdmin();
+      allow create: if isVerifiedUser() && isValidId(productId) && isValidDigitalProduct(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() && isValidId(productId) && isValidDigitalProduct(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'slug', 'title', 'category', 'price', 'showPrice', 'format',
+          'fileSize', 'compatibility', 'summary', 'description', 'includes',
+          'imageUrl', 'driveFileId', 'gallery', 'isFeatured', 'isPublished', 'sortOrder',
+          'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(productId) && isAdmin();
     }
 
     // 4. Orders (Customer owns own orders; Admin confirms final price & status)
@@ -385,7 +508,7 @@ service cloud.firestore {
         isAdmin() &&
         incoming().diff(existing()).affectedKeys().hasOnly([
           'title', 'clientName', 'category', 'year', 'summary', 'challenge',
-          'outcome', 'metrics', 'imageUrl', 'driveFileId', 'projectUrl',
+          'outcome', 'metrics', 'imageUrl', 'driveFileId', 'gallery', 'projectUrl',
           'isFeatured', 'isPublished', 'sortOrder', 'updatedAt'
         ]);
       allow delete: if isVerifiedUser() && isValidId(portfolioId) && isAdmin();
@@ -403,16 +526,40 @@ service cloud.firestore {
         isAdmin();
       allow create: if isVerifiedUser() && isValidId(mediaId) && isValidMedia(incoming()) &&
         incoming().ownerUid == request.auth.uid &&
-        incoming().createdAt == request.time && (
+        incoming().createdAt == request.time &&
+        (!('updatedAt' in incoming()) || incoming().updatedAt == request.time) && (
           isAdmin() ||
           (incoming().visibility == 'private' && incoming().usage == 'order_attachment')
         );
       allow update: if isVerifiedUser() && isValidId(mediaId) && isValidMedia(incoming()) &&
         incoming().ownerUid == existing().ownerUid &&
         incoming().createdAt == existing().createdAt &&
+        (!('updatedAt' in incoming()) || incoming().updatedAt == request.time) &&
         isAdmin() &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['fileName', 'visibility', 'usage', 'altText']);
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'fileId', 'fileName', 'mimeType', 'sizeBytes', 'visibility', 'usage',
+          'altText', 'folderId', 'folderPath', 'entityType', 'entityId',
+          'entityName', 'isPublished', 'updatedAt'
+        ]);
       allow delete: if isVerifiedUser() && isValidId(mediaId) && isAdmin();
+    }
+
+    // 6b. Drive Folders Cache (Admin-only Google Drive folder ID mapping)
+    match /drive_folders/{folderKey} {
+      allow get: if isValidId(folderKey) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isVerifiedUser() && isValidId(folderKey) && isValidDriveFolder(incoming()) &&
+        incoming().folderKey == folderKey &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() && isValidId(folderKey) && isValidDriveFolder(incoming()) &&
+        incoming().folderKey == existing().folderKey &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'folderId', 'folderName', 'parentFolderId', 'category', 'entityId', 'folderPath', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(folderKey) && isAdmin();
     }
 
     // 7. Site Settings (Public studio info; Admin write only)
@@ -426,9 +573,11 @@ service cloud.firestore {
         incoming().updatedAt == request.time &&
         isAdmin() &&
         incoming().diff(existing()).affectedKeys().hasOnly([
-          'studioName', 'slogan', 'heroHeadline', 'heroSubheadline', 'aboutSummary',
-          'aboutMission', 'whatsappNumber', 'email', 'address', 'operatingHours',
-          'instagramUrl', 'tiktokUrl', 'youtubeUrl', 'linkedinUrl', 'updatedAt'
+          'studioName', 'slogan', 'heroHeadline', 'heroSubheadline', 'heroImageUrl',
+          'heroDriveFileId', 'aboutSummary', 'aboutMission', 'whatsappNumber', 'email',
+          'address', 'operatingHours', 'instagramUrl', 'tiktokUrl', 'youtubeUrl',
+          'linkedinUrl', 'servicesMigrated', 'productsMigrated', 'portfolioMigrated',
+          'faqsMigrated', 'updatedAt'
         ]);
       allow delete: if false;
     }

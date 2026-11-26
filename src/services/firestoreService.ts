@@ -26,6 +26,7 @@ import {
   INITIAL_SERVICES,
   INITIAL_SITE_SETTINGS,
 } from '../data/initialCatalog';
+import { INITIAL_DIGITAL_PRODUCTS, PRODUCT_IMAGES } from '../data/digitalProducts';
 import {
   formatServicePriceLabel,
   normalizeWhatsappNumber,
@@ -37,19 +38,49 @@ import type {
   AdminRecord,
   ContactMessage,
   CustomerProfile,
+  DigitalProductItem,
+  DriveFolderRecord,
   FaqItem,
   MediaAsset,
+  MediaGalleryItem,
   OrderItem,
   OrderStatus,
   PortfolioItem,
   ServiceItem,
   SiteSettings,
 } from '../types/studio';
+import type { MediaUsageReference } from '../utils/studioLogic';
 
 function randomDocId(prefix: string): string {
   const rand = Math.random().toString(36).slice(2, 10);
   const ts = Date.now().toString(36);
   return `${prefix}_${ts}_${rand}`.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+function sanitizeGalleryItems(gallery?: MediaGalleryItem[]): MediaGalleryItem[] {
+  if (!Array.isArray(gallery)) return [];
+  const seen = new Set<string>();
+  const clean: MediaGalleryItem[] = [];
+  for (const item of gallery) {
+    if (!item || typeof item.fileId !== 'string') continue;
+    const fileId = item.fileId.trim().slice(0, 200);
+    if (fileId.length < 3 || seen.has(fileId)) continue;
+    seen.add(fileId);
+    const entry: MediaGalleryItem = {
+      fileId,
+      fileName: (item.fileName || 'Media').trim().slice(0, 200) || 'Media',
+      mimeType: (item.mimeType || 'image/jpeg').trim().slice(0, 100) || 'image/jpeg',
+    };
+    if (item.caption && item.caption.trim()) {
+      entry.caption = item.caption.trim().slice(0, 180);
+    }
+    if (item.imageUrl && sanitizeExternalUrl(item.imageUrl)) {
+      entry.imageUrl = sanitizeExternalUrl(item.imageUrl).slice(0, 500);
+    }
+    clean.push(entry);
+    if (clean.length >= 12) break;
+  }
+  return clean;
 }
 
 // -----------------------------------------------------------------------------
@@ -170,6 +201,30 @@ export function subscribePublicServices(
       onError(error);
       try {
         handleFirestoreError(error, OperationType.LIST, 'services');
+      } catch {
+        // Error surfaced through onError callback for resilient public UI
+      }
+    }
+  );
+}
+
+export function subscribePublicDigitalProducts(
+  onData: (items: DigitalProductItem[]) => void,
+  onError: (err: unknown) => void
+): Unsubscribe {
+  const q = query(collection(db, 'digital_products'), where('isPublished', '==', true));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const items = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<DigitalProductItem, 'id'>) }))
+        .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99));
+      onData(items);
+    },
+    (error) => {
+      onError(error);
+      try {
+        handleFirestoreError(error, OperationType.LIST, 'digital_products');
       } catch {
         // Error surfaced through onError callback for resilient public UI
       }
@@ -469,8 +524,10 @@ export async function fetchOrdersPage(options: {
 export async function fetchAllAdminCollections(): Promise<{
   orders: OrderItem[];
   services: ServiceItem[];
+  products: DigitalProductItem[];
   portfolio: PortfolioItem[];
   media: MediaAsset[];
+  driveFolders: DriveFolderRecord[];
   faqs: FaqItem[];
   logs: ActivityLog[];
   messages: ContactMessage[];
@@ -480,8 +537,10 @@ export async function fetchAllAdminCollections(): Promise<{
     const [
       ordersSnap,
       servicesSnap,
+      productsSnap,
       portfolioSnap,
       mediaSnap,
+      driveFoldersSnap,
       faqsSnap,
       logsSnap,
       messagesSnap,
@@ -489,8 +548,10 @@ export async function fetchAllAdminCollections(): Promise<{
     ] = await Promise.all([
       getDocs(collection(db, 'orders')),
       getDocs(collection(db, 'services')),
+      getDocs(collection(db, 'digital_products')),
       getDocs(collection(db, 'portfolio')),
       getDocs(collection(db, 'media')),
+      getDocs(collection(db, 'drive_folders')).catch(() => null),
       getDocs(collection(db, 'faqs')),
       getDocs(collection(db, 'activity_logs')),
       getDocs(collection(db, 'contact_messages')),
@@ -507,12 +568,21 @@ export async function fetchAllAdminCollections(): Promise<{
       services: servicesSnap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<ServiceItem, 'id'>) }))
         .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99)),
+      products: productsSnap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<DigitalProductItem, 'id'>) }))
+        .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99)),
       portfolio: portfolioSnap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<PortfolioItem, 'id'>) }))
         .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99)),
       media: mediaSnap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<MediaAsset, 'id'>) }))
         .sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt)),
+      driveFolders: driveFoldersSnap
+        ? driveFoldersSnap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as Omit<DriveFolderRecord, 'id'>),
+          }))
+        : [],
       faqs: faqsSnap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<FaqItem, 'id'>) }))
         .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99)),
@@ -617,15 +687,13 @@ export async function saveServiceByAdmin(
       deliverables: cleanDeliverables,
       accentColor: service.accentColor,
       imageUrl: sanitizeExternalUrl(service.imageUrl).slice(0, 500) || INITIAL_SERVICES[0].imageUrl,
+      driveFileId: (service.driveFileId || '').trim().slice(0, 200),
+      gallery: sanitizeGalleryItems(service.gallery),
       sortOrder: Math.max(0, Math.round(service.sortOrder ?? 1)),
       isFeatured: Boolean(service.isFeatured),
       isPublished: Boolean(service.isPublished),
       updatedAt: serverTimestamp(),
     };
-
-    if (service.driveFileId && service.driveFileId.trim()) {
-      payload.driveFileId = service.driveFileId.trim().slice(0, 200);
-    }
 
     if (existing.exists()) {
       await updateDoc(ref, payload);
@@ -669,6 +737,97 @@ export async function deleteServiceByAdmin(
   }
 }
 
+export async function saveDigitalProductByAdmin(
+  product: Omit<DigitalProductItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
+  actor: { uid: string; email: string }
+): Promise<string> {
+  const cleanSlug = slugify(product.slug || product.title) || randomDocId('prod').toLowerCase();
+  const id =
+    product.id && /^[a-zA-Z0-9_-]+$/.test(product.id)
+      ? product.id
+      : `prod-${cleanSlug}`.slice(0, 100);
+  const path = `digital_products/${id}`;
+  try {
+    const ref = doc(db, 'digital_products', id);
+    const existing = await getDoc(ref);
+
+    const cleanIncludes = (product.includes || [])
+      .map((item) => item.trim().slice(0, 200))
+      .filter(Boolean)
+      .slice(0, 15);
+    if (cleanIncludes.length === 0) {
+      cleanIncludes.push('File produk digital siap pakai sesuai deskripsi');
+    }
+
+    const cleanPrice = Math.min(1000000000, Math.max(0, Math.round(Number(product.price) || 0)));
+    const safeImageUrl =
+      sanitizeExternalUrl(product.imageUrl).slice(0, 500) || PRODUCT_IMAGES.pptDeck;
+
+    const payload: Record<string, unknown> = {
+      slug: cleanSlug.slice(0, 80),
+      title: product.title.trim().slice(0, 140),
+      category: product.category,
+      price: cleanPrice,
+      showPrice: Boolean(product.showPrice),
+      format: product.format.trim().slice(0, 80) || 'Digital File',
+      fileSize: (product.fileSize || '').trim().slice(0, 40),
+      compatibility: (product.compatibility || '').trim().slice(0, 160),
+      summary: product.summary.trim().slice(0, 320),
+      description: product.description.trim().slice(0, 3000),
+      includes: cleanIncludes,
+      imageUrl: safeImageUrl,
+      driveFileId: (product.driveFileId || '').trim().slice(0, 200),
+      gallery: sanitizeGalleryItems(product.gallery),
+      isFeatured: Boolean(product.isFeatured),
+      isPublished: Boolean(product.isPublished),
+      sortOrder: Math.min(9999, Math.max(0, Math.round(Number(product.sortOrder) || 1))),
+      updatedAt: serverTimestamp(),
+    };
+
+    if (existing.exists()) {
+      await updateDoc(ref, payload);
+    } else {
+      await setDoc(ref, { ...payload, createdAt: serverTimestamp() });
+    }
+
+    await logAdminActivity({
+      actorUid: actor.uid,
+      actorEmail: actor.email,
+      action: existing.exists() ? 'UPDATE_PRODUCT' : 'CREATE_PRODUCT',
+      entityType: 'product',
+      entityId: id,
+      summary: `${existing.exists() ? 'Memperbarui' : 'Menambahkan'} produk digital "${payload.title}" (${
+        payload.isPublished ? 'Publik' : 'Draf'
+      }).`,
+    });
+
+    return id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteDigitalProductByAdmin(
+  productId: string,
+  title: string,
+  actor: { uid: string; email: string }
+): Promise<void> {
+  const path = `digital_products/${productId}`;
+  try {
+    await deleteDoc(doc(db, 'digital_products', productId));
+    await logAdminActivity({
+      actorUid: actor.uid,
+      actorEmail: actor.email,
+      action: 'DELETE_PRODUCT',
+      entityType: 'product',
+      entityId: productId,
+      summary: `Menghapus produk digital "${title}".`,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
 export async function savePortfolioByAdmin(
   item: Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
   actor: { uid: string; email: string }
@@ -697,6 +856,9 @@ export async function savePortfolioByAdmin(
     }
     if (item.driveFileId && item.driveFileId.trim()) {
       payload.driveFileId = item.driveFileId.trim().slice(0, 200);
+    }
+    if (Array.isArray(item.gallery)) {
+      payload.gallery = sanitizeGalleryItems(item.gallery);
     }
     if (item.projectUrl && item.projectUrl.trim()) {
       payload.projectUrl = sanitizeExternalUrl(item.projectUrl).slice(0, 500);
@@ -801,8 +963,47 @@ export async function deleteFaqByAdmin(
   }
 }
 
+export async function saveCachedDriveFolders(
+  folders: Array<{
+    folderKey: string;
+    folderId: string;
+    folderName: string;
+    parentFolderId?: string;
+    category: DriveFolderRecord['category'];
+    entityId?: string;
+    folderPath: string;
+  }>
+): Promise<void> {
+  if (!folders.length) return;
+  try {
+    const batch = writeBatch(db);
+    for (const f of folders) {
+      const cleanKey = f.folderKey.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128);
+      if (!cleanKey || !f.folderId) continue;
+      const payload: Record<string, unknown> = {
+        folderKey: cleanKey,
+        folderId: f.folderId.trim().slice(0, 200),
+        folderName: f.folderName.trim().slice(0, 160),
+        category: f.category,
+        folderPath: f.folderPath.trim().slice(0, 260),
+        updatedAt: serverTimestamp(),
+      };
+      if (f.parentFolderId) {
+        payload.parentFolderId = f.parentFolderId.trim().slice(0, 200);
+      }
+      if (f.entityId) {
+        payload.entityId = f.entityId.trim().slice(0, 128);
+      }
+      batch.set(doc(db, 'drive_folders', cleanKey), payload, { merge: false });
+    }
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'drive_folders');
+  }
+}
+
 export async function saveMediaMetadata(
-  asset: Omit<MediaAsset, 'id' | 'createdAt'>,
+  asset: Omit<MediaAsset, 'id' | 'createdAt' | 'updatedAt'>,
   actor?: { uid: string; email: string; isAdmin: boolean }
 ): Promise<string> {
   const id = randomDocId('med');
@@ -816,10 +1017,27 @@ export async function saveMediaMetadata(
       visibility: asset.visibility,
       usage: asset.usage,
       ownerUid: asset.ownerUid,
+      isPublished: asset.isPublished ?? asset.visibility === 'public',
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     };
     if (asset.altText && asset.altText.trim()) {
       payload.altText = asset.altText.trim().slice(0, 240);
+    }
+    if (asset.folderId && asset.folderId.trim()) {
+      payload.folderId = asset.folderId.trim().slice(0, 200);
+    }
+    if (asset.folderPath && asset.folderPath.trim()) {
+      payload.folderPath = asset.folderPath.trim().slice(0, 260);
+    }
+    if (asset.entityType) {
+      payload.entityType = asset.entityType;
+    }
+    if (asset.entityId && asset.entityId.trim()) {
+      payload.entityId = asset.entityId.trim().slice(0, 128);
+    }
+    if (asset.entityName && asset.entityName.trim()) {
+      payload.entityName = asset.entityName.trim().slice(0, 140);
     }
     await setDoc(doc(db, 'media', id), payload);
 
@@ -830,12 +1048,93 @@ export async function saveMediaMetadata(
         action: 'REGISTER_MEDIA',
         entityType: 'media',
         entityId: id,
-        summary: `Mendaftarkan media Drive "${asset.fileName}" (${asset.visibility}).`,
+        summary: `Menyimpan media "${asset.fileName}" ke ${asset.folderPath || asset.usage} (${asset.visibility}).`,
       });
     }
     return id;
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
+  }
+}
+
+export async function updateMediaMetadataByAdmin(
+  mediaId: string,
+  updates: Partial<
+    Pick<
+      MediaAsset,
+      | 'fileId'
+      | 'fileName'
+      | 'mimeType'
+      | 'sizeBytes'
+      | 'visibility'
+      | 'usage'
+      | 'altText'
+      | 'folderId'
+      | 'folderPath'
+      | 'entityType'
+      | 'entityId'
+      | 'entityName'
+      | 'isPublished'
+    >
+  >,
+  actor: { uid: string; email: string }
+): Promise<void> {
+  const path = `media/${mediaId}`;
+  try {
+    const payload: Record<string, unknown> = {
+      updatedAt: serverTimestamp(),
+    };
+    if (typeof updates.fileId === 'string' && updates.fileId.trim()) {
+      payload.fileId = updates.fileId.trim().slice(0, 200);
+    }
+    if (typeof updates.fileName === 'string' && updates.fileName.trim()) {
+      payload.fileName = updates.fileName.trim().slice(0, 200);
+    }
+    if (typeof updates.mimeType === 'string' && updates.mimeType.trim()) {
+      payload.mimeType = updates.mimeType.trim().slice(0, 100);
+    }
+    if (typeof updates.sizeBytes === 'number' && Number.isFinite(updates.sizeBytes)) {
+      payload.sizeBytes = Math.max(0, Math.round(updates.sizeBytes));
+    }
+    if (updates.visibility) {
+      payload.visibility = updates.visibility;
+      payload.isPublished = updates.isPublished ?? updates.visibility === 'public';
+    } else if (typeof updates.isPublished === 'boolean') {
+      payload.isPublished = updates.isPublished;
+    }
+    if (updates.usage) {
+      payload.usage = updates.usage;
+    }
+    if (typeof updates.altText === 'string') {
+      payload.altText = updates.altText.trim().slice(0, 240);
+    }
+    if (typeof updates.folderId === 'string') {
+      payload.folderId = updates.folderId.trim().slice(0, 200);
+    }
+    if (typeof updates.folderPath === 'string') {
+      payload.folderPath = updates.folderPath.trim().slice(0, 260);
+    }
+    if (updates.entityType) {
+      payload.entityType = updates.entityType;
+    }
+    if (typeof updates.entityId === 'string') {
+      payload.entityId = updates.entityId.trim().slice(0, 128);
+    }
+    if (typeof updates.entityName === 'string') {
+      payload.entityName = updates.entityName.trim().slice(0, 140);
+    }
+
+    await updateDoc(doc(db, 'media', mediaId), payload);
+    await logAdminActivity({
+      actorUid: actor.uid,
+      actorEmail: actor.email,
+      action: 'UPDATE_MEDIA',
+      entityType: 'media',
+      entityId: mediaId,
+      summary: `Memperbarui metadata media "${updates.fileName || mediaId}".`,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
   }
 }
 
@@ -853,7 +1152,98 @@ export async function deleteMediaByAdmin(
       action: 'DELETE_MEDIA',
       entityType: 'media',
       entityId: mediaId,
-      summary: `Menghapus metadata media "${fileName}".`,
+      summary: `Menghapus media "${fileName}".`,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export async function deleteMediaAndCleanupReferences(params: {
+  mediaId: string;
+  fileId: string;
+  fileName: string;
+  usages: MediaUsageReference[];
+  products: DigitalProductItem[];
+  services: ServiceItem[];
+  portfolio: PortfolioItem[];
+  siteSettings: SiteSettings | null;
+  actor: { uid: string; email: string };
+}): Promise<void> {
+  const path = `media/${params.mediaId}`;
+  try {
+    const batch = writeBatch(db);
+    const cleanedProductIds = new Set<string>();
+    const cleanedServiceIds = new Set<string>();
+    const cleanedPortfolioIds = new Set<string>();
+
+    for (const ref of params.usages) {
+      if (ref.entityType === 'product' && !cleanedProductIds.has(ref.entityId)) {
+        cleanedProductIds.add(ref.entityId);
+        const prod = params.products.find((p) => p.id === ref.entityId);
+        if (prod) {
+          const nextGallery = (prod.gallery || []).filter((g) => g.fileId !== params.fileId);
+          const isPrimary =
+            prod.driveFileId === params.fileId ||
+            prod.imageUrl?.includes(`/api/media/${encodeURIComponent(params.fileId)}`);
+          batch.update(doc(db, 'digital_products', prod.id), {
+            driveFileId: isPrimary ? '' : prod.driveFileId || '',
+            imageUrl: isPrimary ? PRODUCT_IMAGES.pptDeck : prod.imageUrl,
+            gallery: sanitizeGalleryItems(nextGallery),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } else if (ref.entityType === 'service' && !cleanedServiceIds.has(ref.entityId)) {
+        cleanedServiceIds.add(ref.entityId);
+        const srv = params.services.find((s) => s.id === ref.entityId);
+        if (srv) {
+          const nextGallery = (srv.gallery || []).filter((g) => g.fileId !== params.fileId);
+          const isPrimary =
+            srv.driveFileId === params.fileId ||
+            srv.imageUrl?.includes(`/api/media/${encodeURIComponent(params.fileId)}`);
+          batch.update(doc(db, 'services', srv.id), {
+            driveFileId: isPrimary ? '' : srv.driveFileId || '',
+            imageUrl: isPrimary ? INITIAL_SERVICES[0].imageUrl : srv.imageUrl,
+            gallery: sanitizeGalleryItems(nextGallery),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } else if (ref.entityType === 'portfolio' && !cleanedPortfolioIds.has(ref.entityId)) {
+        cleanedPortfolioIds.add(ref.entityId);
+        const work = params.portfolio.find((w) => w.id === ref.entityId);
+        if (work) {
+          const nextGallery = (work.gallery || []).filter((g) => g.fileId !== params.fileId);
+          const isPrimary =
+            work.driveFileId === params.fileId ||
+            work.imageUrl?.includes(`/api/media/${encodeURIComponent(params.fileId)}`);
+          batch.update(doc(db, 'portfolio', work.id), {
+            driveFileId: isPrimary ? '' : work.driveFileId || '',
+            imageUrl: isPrimary ? INITIAL_PORTFOLIO[0].imageUrl : work.imageUrl,
+            gallery: sanitizeGalleryItems(nextGallery),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } else if (ref.entityType === 'site_settings' && params.siteSettings) {
+        batch.update(doc(db, 'site_settings', 'general'), {
+          heroDriveFileId: '',
+          heroImageUrl: '',
+          updatedAt: serverTimestamp(),
+        });
+      }
+    }
+
+    batch.delete(doc(db, 'media', params.mediaId));
+    await batch.commit();
+
+    await logAdminActivity({
+      actorUid: params.actor.uid,
+      actorEmail: params.actor.email,
+      action: 'DELETE_MEDIA',
+      entityType: 'media',
+      entityId: params.mediaId,
+      summary: `Menghapus media "${params.fileName}" dari Google Drive & Firestore${
+        params.usages.length > 0 ? ` serta membersihkan ${params.usages.length} referensi aktif.` : '.'
+      }`,
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -873,6 +1263,8 @@ export async function saveSiteSettingsByAdmin(
       slogan: settings.slogan.trim().slice(0, 160),
       heroHeadline: settings.heroHeadline.trim().slice(0, 200),
       heroSubheadline: settings.heroSubheadline.trim().slice(0, 500),
+      heroImageUrl: sanitizeExternalUrl(settings.heroImageUrl).slice(0, 500),
+      heroDriveFileId: (settings.heroDriveFileId || '').trim().slice(0, 200),
       aboutSummary: settings.aboutSummary.trim().slice(0, 1500),
       whatsappNumber: normalizeWhatsappNumber(settings.whatsappNumber).slice(0, 30),
       email: settings.email.trim().slice(0, 200),
@@ -887,6 +1279,19 @@ export async function saveSiteSettingsByAdmin(
     if (settings.linkedinUrl) payload.linkedinUrl = sanitizeExternalUrl(settings.linkedinUrl).slice(0, 300);
 
     if (existing.exists()) {
+      const existingData = existing.data() as Partial<SiteSettings>;
+      if (typeof existingData.servicesMigrated === 'boolean') {
+        payload.servicesMigrated = existingData.servicesMigrated;
+      }
+      if (typeof existingData.productsMigrated === 'boolean') {
+        payload.productsMigrated = existingData.productsMigrated;
+      }
+      if (typeof existingData.portfolioMigrated === 'boolean') {
+        payload.portfolioMigrated = existingData.portfolioMigrated;
+      }
+      if (typeof existingData.faqsMigrated === 'boolean') {
+        payload.faqsMigrated = existingData.faqsMigrated;
+      }
       await updateDoc(ref, payload);
     } else {
       await setDoc(ref, payload);
@@ -898,7 +1303,7 @@ export async function saveSiteSettingsByAdmin(
       action: 'UPDATE_SETTINGS',
       entityType: 'site_settings',
       entityId: 'general',
-      summary: 'Memperbarui konten utama, kontak, dan tautan media sosial studio.',
+      summary: 'Memperbarui konten utama, banner hero, kontak, dan tautan media sosial studio.',
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -927,28 +1332,41 @@ export async function updateContactMessageStatus(
 }
 
 // -----------------------------------------------------------------------------
-// Initial Seeding Helper (Admin-triggered so Firestore has live initial catalog)
+// Non-Destructive Idempotent Production Migration Helper
 // -----------------------------------------------------------------------------
 
 export async function seedInitialStudioData(actor: { uid: string; email: string }): Promise<{
   servicesSeeded: number;
+  productsSeeded: number;
   portfolioSeeded: number;
   faqsSeeded: number;
+  alreadyMigrated: boolean;
 }> {
   try {
     const batch = writeBatch(db);
     let servicesSeeded = 0;
+    let productsSeeded = 0;
     let portfolioSeeded = 0;
     let faqsSeeded = 0;
 
-    const [srvSnap, pfSnap, faqSnap, settingsSnap] = await Promise.all([
+    const [srvSnap, prodSnap, pfSnap, faqSnap, settingsSnap] = await Promise.all([
       getDocs(collection(db, 'services')),
+      getDocs(collection(db, 'digital_products')),
       getDocs(collection(db, 'portfolio')),
       getDocs(collection(db, 'faqs')),
       getDoc(doc(db, 'site_settings', 'general')),
     ]);
 
-    if (srvSnap.empty) {
+    const currentSettings = settingsSnap.exists()
+      ? (settingsSnap.data() as Partial<SiteSettings>)
+      : null;
+
+    const servicesAlreadyMigrated = Boolean(currentSettings?.servicesMigrated);
+    const productsAlreadyMigrated = Boolean(currentSettings?.productsMigrated);
+    const portfolioAlreadyMigrated = Boolean(currentSettings?.portfolioMigrated);
+    const faqsAlreadyMigrated = Boolean(currentSettings?.faqsMigrated);
+
+    if (srvSnap.empty && !servicesAlreadyMigrated) {
       for (const srv of INITIAL_SERVICES) {
         const { id, ...rest } = srv;
         batch.set(doc(db, 'services', id), {
@@ -960,7 +1378,19 @@ export async function seedInitialStudioData(actor: { uid: string; email: string 
       }
     }
 
-    if (pfSnap.empty) {
+    if (prodSnap.empty && !productsAlreadyMigrated) {
+      for (const prod of INITIAL_DIGITAL_PRODUCTS) {
+        const { id, ...rest } = prod;
+        batch.set(doc(db, 'digital_products', id), {
+          ...rest,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        productsSeeded += 1;
+      }
+    }
+
+    if (pfSnap.empty && !portfolioAlreadyMigrated) {
       for (const item of INITIAL_PORTFOLIO) {
         const { id, ...rest } = item;
         batch.set(doc(db, 'portfolio', id), {
@@ -972,7 +1402,7 @@ export async function seedInitialStudioData(actor: { uid: string; email: string 
       }
     }
 
-    if (faqSnap.empty) {
+    if (faqSnap.empty && !faqsAlreadyMigrated) {
       for (const faq of INITIAL_FAQS) {
         const { id, ...rest } = faq;
         batch.set(doc(db, 'faqs', id), {
@@ -984,28 +1414,62 @@ export async function seedInitialStudioData(actor: { uid: string; email: string 
       }
     }
 
+    const needsSettingsFlagUpdate =
+      !settingsSnap.exists() ||
+      !servicesAlreadyMigrated ||
+      !productsAlreadyMigrated ||
+      !portfolioAlreadyMigrated ||
+      !faqsAlreadyMigrated;
+
     if (!settingsSnap.exists()) {
       const { id: _id, ...rest } = INITIAL_SITE_SETTINGS;
       batch.set(doc(db, 'site_settings', 'general'), {
         ...rest,
+        servicesMigrated: true,
+        productsMigrated: true,
+        portfolioMigrated: true,
+        faqsMigrated: true,
+        updatedAt: serverTimestamp(),
+      });
+    } else if (needsSettingsFlagUpdate) {
+      batch.update(doc(db, 'site_settings', 'general'), {
+        servicesMigrated: true,
+        productsMigrated: true,
+        portfolioMigrated: true,
+        faqsMigrated: true,
         updatedAt: serverTimestamp(),
       });
     }
 
-    await batch.commit();
+    const didWrite =
+      servicesSeeded > 0 ||
+      productsSeeded > 0 ||
+      portfolioSeeded > 0 ||
+      faqsSeeded > 0 ||
+      needsSettingsFlagUpdate;
 
-    if (servicesSeeded > 0 || portfolioSeeded > 0 || faqsSeeded > 0 || !settingsSnap.exists()) {
+    if (didWrite) {
+      await batch.commit();
+    }
+
+    if (servicesSeeded > 0 || productsSeeded > 0 || portfolioSeeded > 0 || faqsSeeded > 0) {
       await logAdminActivity({
         actorUid: actor.uid,
         actorEmail: actor.email,
-        action: 'SEED_CATALOG',
+        action: 'MIGRATE_PRODUCTION_CATALOG',
         entityType: 'site_settings',
         entityId: 'general',
-        summary: `Menginisialisasi katalog awal ke Firestore (${servicesSeeded} layanan, ${portfolioSeeded} portofolio, ${faqsSeeded} FAQ).`,
+        summary: `Migrasi katalog produksi ke Firestore (${productsSeeded} produk digital, ${servicesSeeded} layanan, ${portfolioSeeded} portofolio, ${faqsSeeded} FAQ).`,
       });
     }
 
-    return { servicesSeeded, portfolioSeeded, faqsSeeded };
+    return {
+      servicesSeeded,
+      productsSeeded,
+      portfolioSeeded,
+      faqsSeeded,
+      alreadyMigrated: !didWrite,
+    };
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'seed_initial_data');
   }

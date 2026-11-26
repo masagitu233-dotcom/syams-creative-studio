@@ -135,6 +135,9 @@
           "type": "string",
           "maxLength": 200
         },
+        "gallery": {
+          "type": "array"
+        },
         "sortOrder": {
           "type": "number"
         },
@@ -170,6 +173,108 @@
         "sortOrder",
         "isFeatured",
         "isPublished",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DigitalProduct": {
+      "title": "DigitalProduct",
+      "description": "Produk digital siap pakai (template PPT, poster, web kit, aset video, naskah) yang dikelola admin melalui Firestore.",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "pattern": "^[a-z0-9\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 140
+        },
+        "category": {
+          "type": "string",
+          "enum": ["template_ppt", "template_poster", "ui_web_kit", "aset_video", "naskah_siap_pakai"]
+        },
+        "price": {
+          "type": "number"
+        },
+        "showPrice": {
+          "type": "boolean"
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "fileSize": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "compatibility": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 320
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 3000
+        },
+        "includes": {
+          "type": "array"
+        },
+        "imageUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "driveFileId": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "gallery": {
+          "type": "array"
+        },
+        "isFeatured": {
+          "type": "boolean"
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "sortOrder": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "slug",
+        "title",
+        "category",
+        "price",
+        "showPrice",
+        "format",
+        "fileSize",
+        "compatibility",
+        "summary",
+        "description",
+        "includes",
+        "imageUrl",
+        "isFeatured",
+        "isPublished",
+        "sortOrder",
         "createdAt",
         "updatedAt"
       ]
@@ -346,6 +451,9 @@
           "type": "string",
           "maxLength": 200
         },
+        "gallery": {
+          "type": "array"
+        },
         "projectUrl": {
           "type": "string",
           "maxLength": 500
@@ -412,11 +520,34 @@
         },
         "usage": {
           "type": "string",
-          "enum": ["service", "portfolio", "hero", "order_attachment", "other"]
+          "enum": ["service", "product", "portfolio", "hero", "order_attachment", "other"]
         },
         "altText": {
           "type": "string",
           "maxLength": 240
+        },
+        "folderId": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "folderPath": {
+          "type": "string",
+          "maxLength": 260
+        },
+        "entityType": {
+          "type": "string",
+          "enum": ["product", "service", "portfolio", "hero", "none"]
+        },
+        "entityId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "entityName": {
+          "type": "string",
+          "maxLength": 140
+        },
+        "isPublished": {
+          "type": "boolean"
         },
         "ownerUid": {
           "type": "string",
@@ -425,6 +556,10 @@
           "pattern": "^[a-zA-Z0-9_\\-]+$"
         },
         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
@@ -438,6 +573,58 @@
         "usage",
         "ownerUid",
         "createdAt"
+      ]
+    },
+    "DriveFolder": {
+      "title": "DriveFolder",
+      "description": "Cache struktur folder otomatis Google Drive untuk SYAMS CREATIVE STUDIO agar tidak membuat folder duplikat.",
+      "type": "object",
+      "properties": {
+        "folderKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "folderId": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "folderName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "parentFolderId": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "enum": ["root", "service", "product", "portfolio", "hero", "order_attachment", "other"]
+        },
+        "entityId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "folderPath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 260
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "folderKey",
+        "folderId",
+        "folderName",
+        "category",
+        "folderPath",
+        "updatedAt"
       ]
     },
     "SiteSettings": {
@@ -460,6 +647,14 @@
         "heroSubheadline": {
           "type": "string",
           "maxLength": 500
+        },
+        "heroImageUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "heroDriveFileId": {
+          "type": "string",
+          "maxLength": 200
         },
         "aboutSummary": {
           "type": "string",
@@ -500,6 +695,18 @@
         "linkedinUrl": {
           "type": "string",
           "maxLength": 300
+        },
+        "servicesMigrated": {
+          "type": "boolean"
+        },
+        "productsMigrated": {
+          "type": "boolean"
+        },
+        "portfolioMigrated": {
+          "type": "boolean"
+        },
+        "faqsMigrated": {
+          "type": "boolean"
         },
         "updatedAt": {
           "type": "string",
@@ -585,7 +792,7 @@
         },
         "entityType": {
           "type": "string",
-          "enum": ["order", "service", "portfolio", "media", "faq", "site_settings", "admin", "contact"]
+          "enum": ["order", "service", "product", "portfolio", "media", "faq", "site_settings", "admin", "contact"]
         },
         "entityId": {
           "type": "string",
@@ -665,6 +872,10 @@
       "schema": { "$ref": "#/entities/Service" },
       "description": "Katalog layanan dan estimasi harga dinamis."
     },
+    "/digital_products/{productId}": {
+      "schema": { "$ref": "#/entities/DigitalProduct" },
+      "description": "Katalog produk digital siap pakai yang dikelola administrator."
+    },
     "/orders/{orderId}": {
       "schema": { "$ref": "#/entities/Order" },
       "description": "Pesanan jasa digital; pelanggan hanya dapat membaca pesanan dengan customerUid miliknya."
@@ -675,7 +886,11 @@
     },
     "/media/{mediaId}": {
       "schema": { "$ref": "#/entities/MediaAsset" },
-      "description": "Metadata file Google Drive publik maupun privat."
+      "description": "Metadata file Google Drive publik maupun privat beserta kategori, folder, dan relasi entitas."
+    },
+    "/drive_folders/{folderKey}": {
+      "schema": { "$ref": "#/entities/DriveFolder" },
+      "description": "Cache ID folder Google Drive untuk struktur SYAMS CREATIVE STUDIO dan subfolder entitas (khusus admin)."
     },
     "/site_settings/{settingId}": {
       "schema": { "$ref": "#/entities/SiteSettings" },

@@ -8,10 +8,19 @@ import { formatUserFriendlyError } from '../../lib/firestoreErrors';
 import { SERVICE_CATEGORY_LABELS } from '../../utils/studioLogic';
 import { STUDIO_IMAGES } from '../../data/initialCatalog';
 import { ConfirmDialog } from '../ConfirmDialog';
-import type { PortfolioItem, ServiceCategory } from '../../types/studio';
+import { AdminImagePicker } from './AdminImagePicker';
+import type {
+  DriveFolderRecord,
+  MediaAsset,
+  MediaGalleryItem,
+  PortfolioItem,
+  ServiceCategory,
+} from '../../types/studio';
 
 interface AdminPortfolioPanelProps {
   items: PortfolioItem[];
+  media: MediaAsset[];
+  driveFolders?: DriveFolderRecord[];
   actor: { uid: string; email: string };
   onRefresh: () => Promise<void>;
   onToast: (t: { type: 'success' | 'error' | 'info'; title: string; description?: string }) => void;
@@ -29,6 +38,7 @@ const EMPTY_FORM = {
   metrics: '',
   imageUrl: STUDIO_IMAGES.webApp as string,
   driveFileId: '',
+  gallery: [] as MediaGalleryItem[],
   projectUrl: '',
   isFeatured: true,
   isPublished: true,
@@ -37,6 +47,8 @@ const EMPTY_FORM = {
 
 export function AdminPortfolioPanel({
   items,
+  media,
+  driveFolders = [],
   actor,
   onRefresh,
   onToast,
@@ -65,6 +77,7 @@ export function AdminPortfolioPanel({
       metrics: item.metrics,
       imageUrl: item.imageUrl,
       driveFileId: item.driveFileId || '',
+      gallery: item.gallery || [],
       projectUrl: item.projectUrl || '',
       isFeatured: item.isFeatured,
       isPublished: item.isPublished,
@@ -99,6 +112,7 @@ export function AdminPortfolioPanel({
           metrics: form.metrics || 'Selesai sesuai target klien',
           imageUrl: form.imageUrl,
           driveFileId: form.driveFileId,
+          gallery: form.gallery,
           projectUrl: form.projectUrl,
           isFeatured: form.isFeatured,
           isPublished: form.isPublished,
@@ -287,44 +301,37 @@ export function AdminPortfolioPanel({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <label htmlFor="pf-drive" className="block text-xs font-bold">
-                Google Drive File ID (Publik)
-              </label>
-              <input
-                id="pf-drive"
-                type="text"
-                value={form.driveFileId}
-                onChange={(e) => setForm((f) => ({ ...f, driveFileId: e.target.value }))}
-                className="nb-input font-mono text-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="pf-img" className="block text-xs font-bold">
-                URL Gambar Fallback
-              </label>
-              <input
-                id="pf-img"
-                type="text"
-                value={form.imageUrl}
-                onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
-                className="nb-input text-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="pf-url" className="block text-xs font-bold">
-                Tautan Proyek (Opsional)
-              </label>
-              <input
-                id="pf-url"
-                type="url"
-                value={form.projectUrl}
-                onChange={(e) => setForm((f) => ({ ...f, projectUrl: e.target.value }))}
-                placeholder="https://..."
-                className="nb-input text-sm"
-              />
-            </div>
+          <AdminImagePicker
+            label="Foto Utama & Galeri Dokumentasi Proyek (Google Drive)"
+            imageUrl={form.imageUrl}
+            driveFileId={form.driveFileId}
+            usage="portfolio"
+            media={media}
+            driveFolders={driveFolders}
+            entityId={form.id || undefined}
+            entityName={form.title || undefined}
+            gallery={form.gallery}
+            onGalleryChange={(gallery) => setForm((f) => ({ ...f, gallery }))}
+            actor={actor}
+            onChange={({ imageUrl, driveFileId }) =>
+              setForm((f) => ({ ...f, imageUrl, driveFileId }))
+            }
+            onMediaUploaded={onRefresh}
+            onToast={onToast}
+          />
+
+          <div className="space-y-1">
+            <label htmlFor="pf-url" className="block text-xs font-bold">
+              Tautan Proyek (Opsional)
+            </label>
+            <input
+              id="pf-url"
+              type="url"
+              value={form.projectUrl}
+              onChange={(e) => setForm((f) => ({ ...f, projectUrl: e.target.value }))}
+              placeholder="https://..."
+              className="nb-input text-sm"
+            />
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">

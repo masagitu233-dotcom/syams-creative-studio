@@ -5,9 +5,10 @@
 2. **Customer PII Isolation**: `/customers/{customerId}` documents contain personal emails and WhatsApp numbers; `get` is strictly limited to `request.auth.uid == customerId || isAdmin()`, and `list` is restricted to `isAdmin()`.
 3. **Order Ownership & Pricing Integrity**: Customers may only `get` or `list` `/orders` where `resource.data.customerUid == request.auth.uid`. On order `create`, `customerUid` must match `request.auth.uid`, `status` must be `'menunggu_konfirmasi'`, `finalPrice` must be `null`, `adminNote` must be `''`, and timestamps must equal `request.time`.
 4. **Terminal State Locking**: Customers can only cancel their own order while `status == 'menunggu_konfirmasi'`. Once confirmed, in progress, completed, or cancelled, customers cannot alter the order.
-5. **Public vs Draft Catalog Enforcement**: Unauthenticated visitors and customers may only read `/services`, `/portfolio`, and `/faqs` where `isPublished == true`.
-6. **Media Visibility Partition**: `/media` documents with `visibility == 'private'` are readable only by `ownerUid == request.auth.uid` or `isAdmin()`. Customers may only register `private` media owned by themselves; only admins can register `public` media.
-7. **Immutable Audit Logs**: `/activity_logs` are append-only by admins (`update` and `delete` are denied for everyone).
+5. **Public vs Draft Catalog Enforcement**: Unauthenticated visitors and customers may only read `/services`, `/digital_products`, `/portfolio`, and `/faqs` where `isPublished == true`. Only verified administrators may read drafts or write/delete catalog records.
+6. **Media Visibility Partition**: `/media` documents with `visibility == 'private'` are readable only by `ownerUid == request.auth.uid` or `isAdmin()`. Customers may only register `private` media owned by themselves; only admins can register `public` media, update metadata, or delete media assets.
+7. **Drive Folder Cache Isolation**: `/drive_folders/{folderKey}` stores Google Drive folder ID mappings for the studio hierarchy (`SYAMS CREATIVE STUDIO` and subfolders) and is strictly accessible (`get`, `list`, `create`, `update`, `delete`) by verified administrators only.
+8. **Immutable Audit Logs**: `/activity_logs` are append-only by admins (`update` and `delete` are denied for everyone).
 
 ## 2. The "Dirty Dozen" Adversarial Payloads
 1. **Self-Admin Privilege Escalation**: Regular user writes `/admins/{uid}` with `{ role: "super_admin" }` -> DENIED.
@@ -21,4 +22,4 @@
 9. **Draft Service Leakage**: Anonymous user reads `/services/{id}` where `isPublished == false` -> DENIED.
 10. **ID Poisoning**: Attacker writes document with 200-char or invalid-character ID (`../../evil`) -> DENIED.
 11. **Unverified Email Admin Spoof**: Attacker signs in with matching email but `email_verified == false` -> DENIED.
-12. **Audit Log Tampering**: Admin attempts to `update` or `delete` `/activity_logs/{id}` -> DENIED.
+12. **Audit Log & Drive Folder Tampering**: Regular user attempts to read/write `/drive_folders/{key}` or admin attempts to `update`/`delete` `/activity_logs/{id}` -> DENIED.

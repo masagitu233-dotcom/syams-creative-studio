@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity,
   ArrowLeft,
@@ -12,6 +12,8 @@ import {
   Lock,
   LogIn,
   LogOut,
+  Package,
+  Plus,
   RefreshCw,
   Settings,
   ShoppingBag,
@@ -24,6 +26,7 @@ import {
 } from '../services/firestoreService';
 import { formatUserFriendlyError } from '../lib/firestoreErrors';
 import {
+  computeCatalogStats,
   computeOrderStats,
   formatDateTimeId,
   formatRupiah,
@@ -31,6 +34,7 @@ import {
 } from '../utils/studioLogic';
 import { INITIAL_SITE_SETTINGS } from '../data/initialCatalog';
 import { AdminOrdersPanel } from '../components/admin/AdminOrdersPanel';
+import { AdminProductsPanel } from '../components/admin/AdminProductsPanel';
 import { AdminServicesPanel } from '../components/admin/AdminServicesPanel';
 import { AdminPortfolioPanel } from '../components/admin/AdminPortfolioPanel';
 import { AdminMediaPanel } from '../components/admin/AdminMediaPanel';
@@ -41,6 +45,8 @@ import { ToastStack } from '../components/ToastStack';
 import type {
   ActivityLog,
   ContactMessage,
+  DigitalProductItem,
+  DriveFolderRecord,
   FaqItem,
   MediaAsset,
   OrderItem,
@@ -51,42 +57,78 @@ import type {
 
 type AdminTab =
   | 'overview'
-  | 'orders'
+  | 'products'
   | 'services'
-  | 'portfolio'
-  | 'media'
-  | 'faqs'
+  | 'orders'
   | 'settings'
+  | 'portfolio'
+  | 'faqs'
+  | 'media'
   | 'logs';
 
-const ADMIN_TABS: { id: AdminTab; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'overview', label: 'Ringkasan', icon: LayoutDashboard },
-  { id: 'orders', label: 'Pesanan', icon: ShoppingBag },
-  { id: 'services', label: 'Layanan & Harga', icon: Briefcase },
-  { id: 'portfolio', label: 'Portofolio', icon: FolderKanban },
-  { id: 'media', label: 'Media Drive', icon: HardDrive },
-  { id: 'faqs', label: 'FAQ', icon: HelpCircle },
-  { id: 'settings', label: 'Konten & Kontak', icon: Settings },
-  { id: 'logs', label: 'Activity Logs', icon: Activity },
+interface AdminNavItem {
+  id: AdminTab;
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  group: 'primary' | 'secondary';
+}
+
+const ADMIN_NAV_ITEMS: AdminNavItem[] = [
+  { id: 'overview', path: '/admin', label: 'Ringkasan Dashboard', icon: LayoutDashboard, group: 'primary' },
+  { id: 'products', path: '/admin/produk', label: 'Kelola Produk Digital', icon: Package, group: 'primary' },
+  { id: 'services', path: '/admin/layanan', label: 'Kelola Layanan', icon: Briefcase, group: 'primary' },
+  { id: 'orders', path: '/admin/pesanan', label: 'Kelola Pesanan', icon: ShoppingBag, group: 'primary' },
+  { id: 'settings', path: '/admin/pengaturan', label: 'Pengaturan Website', icon: Settings, group: 'primary' },
+  { id: 'portfolio', path: '/admin/portofolio', label: 'Portofolio', icon: FolderKanban, group: 'secondary' },
+  { id: 'faqs', path: '/admin/faq', label: 'FAQ', icon: HelpCircle, group: 'secondary' },
+  { id: 'media', path: '/admin/media', label: 'Media Library', icon: HardDrive, group: 'secondary' },
+  { id: 'logs', path: '/admin/logs', label: 'Riwayat Aktivitas', icon: Activity, group: 'secondary' },
 ];
+
+function resolveTabFromPath(pathname: string): AdminTab {
+  const normalized = pathname.replace(/\/+$/, '') || '/admin';
+  const match = ADMIN_NAV_ITEMS.find((item) => item.path === normalized);
+  return match ? match.id : 'overview';
+}
 
 export function AdminDashboardPage() {
   const { user, authReady, isAdmin, checkingRole, authError, signInWithGoogle, logout } = useAuth();
   const { pushToast } = useStudioData();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const activeTab = resolveTabFromPath(location.pathname);
+
   const [loadingData, setLoadingData] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [autoOpenTarget, setAutoOpenTarget] = useState<'products' | 'services' | null>(null);
 
   const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [products, setProducts] = useState<DigitalProductItem[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [media, setMedia] = useState<MediaAsset[]>([]);
+  const [driveFolders, setDriveFolders] = useState<DriveFolderRecord[]>([]);
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [settings, setSettings] = useState<SiteSettings>(INITIAL_SITE_SETTINGS);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  const autoMigratedRef = useRef(false);
+
+  const goToTab = useCallback(
+    (tabId: AdminTab, options?: { openCreate?: boolean }) => {
+      const target = ADMIN_NAV_ITEMS.find((item) => item.id === tabId);
+      if (options?.openCreate && (tabId === 'products' || tabId === 'services')) {
+        setAutoOpenTarget(tabId);
+      }
+      navigate(target ? target.path : '/admin');
+    },
+    [navigate]
+  );
 
   const loadDashboardData = useCallback(async () => {
     setLoadingData(true);
@@ -94,31 +136,89 @@ export function AdminDashboardPage() {
     try {
       const data = await fetchAllAdminCollections();
       setOrders(data.orders);
+      setProducts(data.products);
       setServices(data.services);
       setPortfolio(data.portfolio);
       setMedia(data.media);
+      setDriveFolders(data.driveFolders || []);
       setFaqs(data.faqs);
       setLogs(data.logs);
       setMessages(data.messages);
       if (data.siteSettings) {
         setSettings(data.siteSettings);
       }
+      setHasLoadedOnce(true);
+      return data;
     } catch (err) {
       setDataError(
         formatUserFriendlyError(err, 'Gagal memuat koleksi dashboard dari Cloud Firestore.')
       );
+      return null;
     } finally {
       setLoadingData(false);
     }
   }, []);
 
   useEffect(() => {
-    if (authReady && !checkingRole && user && isAdmin) {
-      void loadDashboardData();
-    }
-  }, [authReady, checkingRole, user, isAdmin, loadDashboardData]);
+    if (!authReady || checkingRole || !user || !isAdmin) return;
 
-  const stats = useMemo(() => computeOrderStats(orders), [orders]);
+    let cancelled = false;
+    void (async () => {
+      const data = await loadDashboardData();
+      if (cancelled || !data) return;
+
+      const needsAutoMigration =
+        !autoMigratedRef.current &&
+        (!data.siteSettings?.productsMigrated ||
+          !data.siteSettings?.servicesMigrated ||
+          !data.siteSettings?.portfolioMigrated ||
+          !data.siteSettings?.faqsMigrated);
+
+      if (needsAutoMigration) {
+        autoMigratedRef.current = true;
+        setSeeding(true);
+        try {
+          const res = await seedInitialStudioData({
+            uid: user.uid,
+            email: user.email || '',
+          });
+          if (!cancelled) {
+            await loadDashboardData();
+            if (res.productsSeeded > 0 || res.servicesSeeded > 0) {
+              pushToast({
+                type: 'success',
+                title: 'Katalog Produksi Tersinkron ke Firestore',
+                description: `${res.productsSeeded} produk digital dan ${res.servicesSeeded} layanan berhasil dimigrasikan tanpa menghapus data lama.`,
+              });
+            }
+          }
+        } catch (err) {
+          if (!cancelled) {
+            pushToast({
+              type: 'error',
+              title: 'Sinkronisasi Awal Tertunda',
+              description: formatUserFriendlyError(
+                err,
+                'Gunakan tombol sinkronisasi manual untuk menyelesaikan migrasi katalog.'
+              ),
+            });
+          }
+        } finally {
+          if (!cancelled) setSeeding(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, checkingRole, user, isAdmin, loadDashboardData, pushToast]);
+
+  const orderStats = useMemo(() => computeOrderStats(orders), [orders]);
+  const catalogStats = useMemo(
+    () => computeCatalogStats(products, services),
+    [products, services]
+  );
 
   async function handleSeedCatalog() {
     if (!user) return;
@@ -131,13 +231,17 @@ export function AdminDashboardPage() {
       await loadDashboardData();
       pushToast({
         type: 'success',
-        title: 'Katalog Awal Berhasil Disimpan ke Firestore',
-        description: `${res.servicesSeeded} layanan, ${res.portfolioSeeded} portofolio, dan ${res.faqsSeeded} FAQ telah aktif di database.`,
+        title: res.alreadyMigrated
+          ? 'Database Sudah Dalam Mode Produksi'
+          : 'Katalog Berhasil Disimpan ke Firestore',
+        description: res.alreadyMigrated
+          ? 'Seluruh koleksi katalog sudah aktif dan dikelola dari Firestore.'
+          : `${res.productsSeeded} produk digital, ${res.servicesSeeded} layanan, ${res.portfolioSeeded} portofolio, dan ${res.faqsSeeded} FAQ aktif di database.`,
       });
     } catch (err) {
       pushToast({
         type: 'error',
-        title: 'Gagal Inisialisasi Data Awal',
+        title: 'Gagal Sinkronisasi Data Awal',
         description: formatUserFriendlyError(err, 'Gagal menulis data awal ke Firestore.'),
       });
     } finally {
@@ -243,7 +347,7 @@ export function AdminDashboardPage() {
               className="nb-btn nb-btn-surface px-4 py-2 text-xs sm:text-sm"
             >
               <LogOut className="w-4 h-4" />
-              Keluar & Ganti Akun
+              Keluar &amp; Ganti Akun
             </button>
           </div>
         </div>
@@ -253,37 +357,110 @@ export function AdminDashboardPage() {
   }
 
   const actor = { uid: user.uid, email: user.email || '' };
-  const needsSeed = services.length === 0 || portfolio.length === 0 || faqs.length === 0;
+  const needsManualSeed =
+    hasLoadedOnce &&
+    !seeding &&
+    (!settings.productsMigrated || !settings.servicesMigrated);
+
+  const primaryNav = ADMIN_NAV_ITEMS.filter((item) => item.group === 'primary');
+  const secondaryNav = ADMIN_NAV_ITEMS.filter((item) => item.group === 'secondary');
+
+  function getNavBadge(tabId: AdminTab): number | null {
+    if (tabId === 'products') return products.length;
+    if (tabId === 'services') return services.length;
+    if (tabId === 'orders') return orders.length;
+    if (tabId === 'portfolio') return portfolio.length;
+    if (tabId === 'faqs') return faqs.length;
+    if (tabId === 'media') return media.length;
+    return null;
+  }
+
+  const activeNavMeta = ADMIN_NAV_ITEMS.find((t) => t.id === activeTab);
 
   return (
     <div className="min-h-screen bg-[#F8F8E1] flex flex-col lg:flex-row">
       {/* Sidebar */}
-      <aside className="lg:w-56 lg:sticky lg:top-0 lg:h-screen shrink-0 bg-[#0F3D3A] text-[#F8F8E1] border-b-2 lg:border-b-0 lg:border-r-2 border-[#171717] flex flex-col justify-between">
+      <aside className="lg:w-60 lg:sticky lg:top-0 lg:h-screen shrink-0 bg-[#0F3D3A] text-[#F8F8E1] border-b-2 lg:border-b-0 lg:border-r-2 border-[#171717] flex flex-col justify-between overflow-y-auto">
         <div>
           <div className="px-4 h-14 border-b-2 border-[#171717] flex flex-col justify-center">
             <Link to="/" className="font-display font-bold text-sm text-[#F3C95B] leading-tight">
               SYAMS CREATIVE STUDIO
             </Link>
-            <p className="text-[11px] text-[#F8F8E1]/75">Dashboard Administrator</p>
+            <p className="text-[11px] text-[#F8F8E1]/75">Panel Admin Produksi</p>
           </div>
 
-          <nav aria-label="Menu dashboard admin" className="p-2.5 flex lg:flex-col gap-1 overflow-x-auto">
-            {ADMIN_TABS.map((tab) => {
+          <nav aria-label="Menu utama dashboard admin" className="p-2.5 flex lg:flex-col gap-1 overflow-x-auto">
+            <p className="hidden lg:block px-2.5 pt-1 pb-1 text-[10px] font-mono uppercase tracking-wider text-[#8ACCD5]/80">
+              Manajemen Utama
+            </p>
+            {primaryNav.map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
+              const badge = getNavBadge(tab.id);
               return (
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-3 py-2 text-xs font-display font-semibold rounded-[4px] border-2 whitespace-nowrap transition-colors cursor-pointer ${
+                  onClick={() => goToTab(tab.id)}
+                  className={`flex items-center justify-between gap-2 px-3 py-2 text-xs font-display font-semibold rounded-[4px] border-2 whitespace-nowrap transition-colors cursor-pointer ${
                     active
                       ? 'bg-[#F3C95B] text-[#171717] border-[#171717] nb-shadow-sm'
                       : 'border-transparent text-[#F8F8E1]/90 hover:bg-[#16534F]'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  {tab.label}
+                  <span className="inline-flex items-center gap-2 min-w-0">
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{tab.label}</span>
+                  </span>
+                  {badge !== null && (
+                    <span
+                      className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-[2px] border ${
+                        active
+                          ? 'bg-[#0F3D3A] text-[#F3C95B] border-[#171717]'
+                          : 'bg-[#0A2B29] text-[#8ACCD5] border-[#8ACCD5]/30'
+                      }`}
+                    >
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            <div className="hidden lg:block my-2 border-t border-[#F8F8E1]/15" />
+            <p className="hidden lg:block px-2.5 pb-1 text-[10px] font-mono uppercase tracking-wider text-[#8ACCD5]/80">
+              Konten &amp; Sistem
+            </p>
+            {secondaryNav.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
+              const badge = getNavBadge(tab.id);
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => goToTab(tab.id)}
+                  className={`flex items-center justify-between gap-2 px-3 py-2 text-xs font-display font-semibold rounded-[4px] border-2 whitespace-nowrap transition-colors cursor-pointer ${
+                    active
+                      ? 'bg-[#F3C95B] text-[#171717] border-[#171717] nb-shadow-sm'
+                      : 'border-transparent text-[#F8F8E1]/85 hover:bg-[#16534F]'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-2 min-w-0">
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{tab.label}</span>
+                  </span>
+                  {badge !== null && (
+                    <span
+                      className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-[2px] border ${
+                        active
+                          ? 'bg-[#0F3D3A] text-[#F3C95B] border-[#171717]'
+                          : 'bg-[#0A2B29] text-[#8ACCD5] border-[#8ACCD5]/30'
+                      }`}
+                    >
+                      {badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -316,7 +493,7 @@ export function AdminDashboardPage() {
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="sticky top-0 z-30 bg-white border-b-2 border-[#171717] px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
           <p className="text-xs sm:text-sm font-display font-bold text-[#171717] truncate">
-            Admin / {ADMIN_TABS.find((t) => t.id === activeTab)?.label}
+            Admin / {activeNavMeta?.label || 'Ringkasan Dashboard'}
           </p>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -346,18 +523,23 @@ export function AdminDashboardPage() {
             </div>
           )}
 
-          {needsSeed && !loadingData && (
+          {seeding && (
+            <div className="p-3.5 bg-[#8ACCD5]/45 border-2 border-[#171717] rounded-[4px] text-xs sm:text-sm font-medium text-[#171717]">
+              Menyinkronkan katalog awal produk digital &amp; layanan ke Cloud Firestore...
+            </div>
+          )}
+
+          {needsManualSeed && !loadingData && (
             <div className="p-4 bg-[#F3C95B] border-2 border-[#171717] nb-shadow-sm rounded-[4px] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-start gap-2.5">
                 <Database className="w-4 h-4 text-[#171717] mt-0.5 shrink-0" />
                 <div className="space-y-0.5">
                   <p className="font-display font-bold text-xs sm:text-sm text-[#171717]">
-                    Inisialisasi Katalog Awal ke Cloud Firestore
+                    Sinkronisasi Katalog Produksi ke Cloud Firestore
                   </p>
                   <p className="text-xs text-[#262626]">
-                    Sebagian koleksi awal (5 layanan & harga, portofolio, FAQ, pengaturan) belum
-                    tersimpan di Firestore. Klik tombol di samping untuk menuliskan data awal ke
-                    database produksi.
+                    Migrasikan katalog produk digital &amp; layanan yang belum tercatat di Firestore
+                    tanpa menghapus data yang sudah ada.
                   </p>
                 </div>
               </div>
@@ -367,54 +549,138 @@ export function AdminDashboardPage() {
                 onClick={() => void handleSeedCatalog()}
                 className="nb-btn nb-btn-primary px-3.5 py-2 text-xs shrink-0"
               >
-                {seeding ? 'Menyimpan...' : 'Inisialisasi Data Awal ke Firestore'}
+                {seeding ? 'Menyimpan...' : 'Sinkronkan ke Firestore'}
               </button>
             </div>
           )}
 
           {activeTab === 'overview' && (
             <div className="space-y-5">
+              {/* Primary Catalog & Order Metrics */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 items-stretch">
-                <div className="nb-card p-4 flex flex-col justify-between">
-                  <p className="text-[11px] font-medium text-[#525252]">Total Pesanan</p>
+                <div className="nb-card p-4 flex flex-col justify-between bg-[#F3C95B]/35">
+                  <p className="text-[11px] font-semibold text-[#525252]">Total Produk Digital</p>
                   <p className="font-mono font-bold text-2xl text-[#171717] tabular-nums mt-1">
-                    {stats.total}
+                    {catalogStats.totalProducts}
+                  </p>
+                  <p className="text-[11px] text-[#404040] mt-1">
+                    <strong className="text-[#0F3D3A]">{catalogStats.publishedProducts}</strong> publik ·{' '}
+                    <strong>{catalogStats.draftProducts}</strong> draf
                   </p>
                 </div>
-                <div className="nb-card p-4 flex flex-col justify-between bg-[#F3C95B]/40">
-                  <p className="text-[11px] font-medium text-[#525252]">Menunggu Konfirmasi</p>
-                  <p className="font-mono font-bold text-2xl text-[#6C151E] tabular-nums mt-1">
-                    {stats.menungguKonfirmasi}
-                  </p>
-                </div>
+
                 <div className="nb-card p-4 flex flex-col justify-between bg-[#8ACCD5]/35">
-                  <p className="text-[11px] font-medium text-[#525252]">Diproses / Revisi</p>
+                  <p className="text-[11px] font-semibold text-[#525252]">Total Layanan</p>
                   <p className="font-mono font-bold text-2xl text-[#0F3D3A] tabular-nums mt-1">
-                    {stats.dalamPengerjaan + stats.revisi + stats.hargaDikonfirmasi}
+                    {catalogStats.totalServices}
+                  </p>
+                  <p className="text-[11px] text-[#404040] mt-1">
+                    <strong className="text-[#0F3D3A]">{catalogStats.publishedServices}</strong> publik ·{' '}
+                    <strong>{catalogStats.draftServices}</strong> draf
                   </p>
                 </div>
-                <div className="nb-card p-4 flex flex-col justify-between bg-[#0F3D3A] text-[#F8F8E1]">
-                  <p className="text-[11px] font-medium text-[#8ACCD5]">Nilai Terkonfirmasi</p>
-                  <p className="font-mono font-bold text-lg sm:text-xl text-[#F3C95B] tabular-nums mt-1 truncate">
-                    {formatRupiah(stats.totalConfirmedRevenue)}
+
+                <div className="nb-card p-4 flex flex-col justify-between">
+                  <p className="text-[11px] font-semibold text-[#525252]">Total Pesanan</p>
+                  <p className="font-mono font-bold text-2xl text-[#171717] tabular-nums mt-1">
+                    {orderStats.total}
                   </p>
+                  <p className="text-[11px] text-[#6C151E] font-medium mt-1">
+                    {orderStats.menungguKonfirmasi} menunggu konfirmasi
+                  </p>
+                </div>
+
+                <div className="nb-card p-4 flex flex-col justify-between bg-[#0F3D3A] text-[#F8F8E1]">
+                  <p className="text-[11px] font-semibold text-[#8ACCD5]">Nilai Terkonfirmasi</p>
+                  <p className="font-mono font-bold text-lg sm:text-xl text-[#F3C95B] tabular-nums mt-1 truncate">
+                    {formatRupiah(orderStats.totalConfirmedRevenue)}
+                  </p>
+                  <p className="text-[11px] text-[#F8F8E1]/80 mt-1">
+                    {orderStats.selesai} pesanan selesai
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Actions for Content Management */}
+              <div className="nb-card p-4 sm:p-5 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="font-display font-bold text-base text-[#171717]">
+                      Akses Cepat Pengelolaan Konten
+                    </h2>
+                    <p className="text-xs text-[#525252]">
+                      Kelola produk digital dan layanan secara langsung; perubahan langsung tayang
+                      di beranda website.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => goToTab('products', { openCreate: true })}
+                    className="nb-btn nb-btn-primary px-3.5 py-2 text-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Tambah Produk Digital
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToTab('products')}
+                    className="nb-btn nb-btn-mustard px-3.5 py-2 text-xs"
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    Kelola Produk Digital ({catalogStats.totalProducts})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToTab('services', { openCreate: true })}
+                    className="nb-btn nb-btn-primary px-3.5 py-2 text-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Tambah Layanan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToTab('services')}
+                    className="nb-btn nb-btn-surface px-3.5 py-2 text-xs"
+                  >
+                    <Briefcase className="w-3.5 h-3.5" />
+                    Kelola Layanan ({catalogStats.totalServices})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToTab('media')}
+                    className="nb-btn nb-btn-surface px-3.5 py-2 text-xs"
+                  >
+                    <HardDrive className="w-3.5 h-3.5" />
+                    Media Library ({media.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToTab('settings')}
+                    className="nb-btn nb-btn-surface px-3.5 py-2 text-xs"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    Pengaturan Website
+                  </button>
                 </div>
               </div>
 
               {/* Status Distribution */}
               <div className="nb-card p-4 sm:p-5 space-y-3">
                 <h2 className="font-display font-bold text-base text-[#171717]">
-                  Statistik Status Pekerjaan
+                  Statistik Status Pesanan
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-stretch">
                   {(
                     [
-                      ['menunggu_konfirmasi', stats.menungguKonfirmasi],
-                      ['harga_dikonfirmasi', stats.hargaDikonfirmasi],
-                      ['dalam_pengerjaan', stats.dalamPengerjaan],
-                      ['revisi', stats.revisi],
-                      ['selesai', stats.selesai],
-                      ['dibatalkan', stats.dibatalkan],
+                      ['menunggu_konfirmasi', orderStats.menungguKonfirmasi],
+                      ['harga_dikonfirmasi', orderStats.hargaDikonfirmasi],
+                      ['dalam_pengerjaan', orderStats.dalamPengerjaan],
+                      ['revisi', orderStats.revisi],
+                      ['selesai', orderStats.selesai],
+                      ['dibatalkan', orderStats.dibatalkan],
                     ] as const
                   ).map(([statusKey, count]) => {
                     const meta = ORDER_STATUS_META[statusKey];
@@ -439,7 +705,7 @@ export function AdminDashboardPage() {
                   <h2 className="font-display font-bold text-base text-[#171717]">Pesanan Terbaru</h2>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('orders')}
+                    onClick={() => goToTab('orders')}
                     className="nb-btn nb-btn-surface px-3 py-1.5 text-xs"
                   >
                     Kelola Semua Pesanan
@@ -497,11 +763,17 @@ export function AdminDashboardPage() {
             </div>
           )}
 
-          {activeTab === 'orders' && (
-            <AdminOrdersPanel
-              orders={orders}
+          {activeTab === 'products' && (
+            <AdminProductsPanel
+              products={products}
+              media={media}
+              driveFolders={driveFolders}
               actor={actor}
-              onRefresh={loadDashboardData}
+              autoOpenCreate={autoOpenTarget === 'products'}
+              onConsumeAutoOpen={() => setAutoOpenTarget(null)}
+              onRefresh={async () => {
+                await loadDashboardData();
+              }}
               onToast={pushToast}
             />
           )}
@@ -509,8 +781,25 @@ export function AdminDashboardPage() {
           {activeTab === 'services' && (
             <AdminServicesPanel
               services={services}
+              media={media}
+              driveFolders={driveFolders}
               actor={actor}
-              onRefresh={loadDashboardData}
+              autoOpenCreate={autoOpenTarget === 'services'}
+              onConsumeAutoOpen={() => setAutoOpenTarget(null)}
+              onRefresh={async () => {
+                await loadDashboardData();
+              }}
+              onToast={pushToast}
+            />
+          )}
+
+          {activeTab === 'orders' && (
+            <AdminOrdersPanel
+              orders={orders}
+              actor={actor}
+              onRefresh={async () => {
+                await loadDashboardData();
+              }}
               onToast={pushToast}
             />
           )}
@@ -518,8 +807,12 @@ export function AdminDashboardPage() {
           {activeTab === 'portfolio' && (
             <AdminPortfolioPanel
               items={portfolio}
+              media={media}
+              driveFolders={driveFolders}
               actor={actor}
-              onRefresh={loadDashboardData}
+              onRefresh={async () => {
+                await loadDashboardData();
+              }}
               onToast={pushToast}
             />
           )}
@@ -527,8 +820,16 @@ export function AdminDashboardPage() {
           {activeTab === 'media' && (
             <AdminMediaPanel
               media={media}
+              driveFolders={driveFolders}
+              products={products}
+              services={services}
+              portfolio={portfolio}
+              orders={orders}
+              siteSettings={settings}
               actor={actor}
-              onRefresh={loadDashboardData}
+              onRefresh={async () => {
+                await loadDashboardData();
+              }}
               onToast={pushToast}
             />
           )}
@@ -537,7 +838,9 @@ export function AdminDashboardPage() {
             <AdminFaqPanel
               faqs={faqs}
               actor={actor}
-              onRefresh={loadDashboardData}
+              onRefresh={async () => {
+                await loadDashboardData();
+              }}
               onToast={pushToast}
             />
           )}
@@ -546,8 +849,12 @@ export function AdminDashboardPage() {
             <AdminSettingsPanel
               settings={settings}
               messages={messages}
+              media={media}
+              driveFolders={driveFolders}
               actor={actor}
-              onRefresh={loadDashboardData}
+              onRefresh={async () => {
+                await loadDashboardData();
+              }}
               onToast={pushToast}
             />
           )}

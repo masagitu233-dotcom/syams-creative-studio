@@ -46,3 +46,39 @@ test('Dirty Dozen guards: email_verified, isValidId, affectedKeys, terminal lock
   // Activity logs immutable
   assert.match(rulesSource, /match \/activity_logs\/\{logId\}[\s\S]*?allow update: if false;[\s\S]*?allow delete: if false;/);
 });
+
+test('Digital products collection enforces publish-only public read and strict admin-only mutations', () => {
+  assert.match(rulesSource, /function isValidDigitalProduct\(data\)/);
+  assert.match(
+    rulesSource,
+    /match \/digital_products\/\{productId\}[\s\S]*?allow get: if isValidId\(productId\) && \(existing\(\)\.isPublished == true \|\| isAdmin\(\)\);/
+  );
+  assert.match(
+    rulesSource,
+    /match \/digital_products\/\{productId\}[\s\S]*?allow list: if resource\.data\.isPublished == true \|\| isAdmin\(\);/
+  );
+  assert.match(
+    rulesSource,
+    /match \/digital_products\/\{productId\}[\s\S]*?allow create: if isVerifiedUser\(\) && isValidId\(productId\) && isValidDigitalProduct\(incoming\(\)\)[\s\S]*?isAdmin\(\);/
+  );
+  assert.match(
+    rulesSource,
+    /match \/digital_products\/\{productId\}[\s\S]*?allow delete: if isVerifiedUser\(\) && isValidId\(productId\) && isAdmin\(\);/
+  );
+});
+
+test('Drive folders cache is strictly admin-only and media/gallery validation is enforced', () => {
+  assert.match(rulesSource, /function isValidOptionalGallery\(data\)/);
+  assert.match(rulesSource, /data\.gallery\.size\(\) <= 12/);
+  assert.match(rulesSource, /function isValidDriveFolder\(data\)/);
+  assert.match(
+    rulesSource,
+    /match \/drive_folders\/\{folderKey\}[\s\S]*?allow get: if isValidId\(folderKey\) && isAdmin\(\);[\s\S]*?allow list: if isAdmin\(\);/
+  );
+  assert.match(
+    rulesSource,
+    /match \/drive_folders\/\{folderKey\}[\s\S]*?allow delete: if isVerifiedUser\(\) && isValidId\(folderKey\) && isAdmin\(\);/
+  );
+});
+
+

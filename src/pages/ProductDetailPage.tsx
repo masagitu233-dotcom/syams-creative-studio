@@ -8,9 +8,9 @@ import {
   HardDrive,
   Layers,
 } from 'lucide-react';
-import { INITIAL_DIGITAL_PRODUCTS } from '../data/digitalProducts';
 import { useStudioData } from '../contexts/StudioDataContext';
 import { StudioImage } from '../components/StudioImage';
+import { MediaGallerySection } from '../components/MediaGallerySection';
 import { ProductCard } from '../components/ProductCard';
 import { SectionHeader } from '../components/SectionHeader';
 import {
@@ -23,9 +23,20 @@ import {
 
 export function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { siteSettings } = useStudioData();
+  const { products, loadingProducts, siteSettings } = useStudioData();
 
-  const product = INITIAL_DIGITAL_PRODUCTS.find(
+  if (loadingProducts) {
+    return (
+      <div className="nb-section">
+        <div className="nb-container space-y-4">
+          <div className="h-4 w-48 bg-[#171717]/10 rounded animate-pulse" />
+          <div className="nb-card h-80 bg-[#171717]/5 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  const product = products.find(
     (item) => item.isPublished && (item.slug === slug || item.id === slug)
   );
 
@@ -50,9 +61,9 @@ export function ProductDetailPage() {
     );
   }
 
-  const related = INITIAL_DIGITAL_PRODUCTS.filter(
-    (item) => item.isPublished && item.id !== product.id
-  ).slice(0, 5);
+  const related = products
+    .filter((item) => item.isPublished && item.id !== product.id)
+    .slice(0, 5);
 
   const waHref = buildWhatsappLink(
     siteSettings.whatsappNumber,
@@ -84,6 +95,7 @@ export function ProductDetailPage() {
             <div className="lg:col-span-5 border-b-2 lg:border-b-0 lg:border-r-2 border-[#171717] bg-[#F1F1D3] flex">
               <StudioImage
                 src={product.imageUrl}
+                driveFileId={product.driveFileId}
                 alt={product.title}
                 aspectClass="w-full aspect-[4/3] max-h-[280px] lg:aspect-auto lg:h-full lg:max-h-none"
                 loading="eager"
@@ -130,14 +142,16 @@ export function ProductDetailPage() {
                   <HardDrive className="w-3.5 h-3.5 text-[#0F3D3A] shrink-0 mt-0.5" />
                   <div className="min-w-0">
                     <p className="text-[10px] text-[#525252]">Ukuran File</p>
-                    <p className="font-mono font-semibold text-xs tabular-nums truncate">{product.fileSize}</p>
+                    <p className="font-mono font-semibold text-xs tabular-nums truncate">
+                      {product.fileSize || '—'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2 p-2.5 bg-[#F8F8E1]/70 border border-[#171717]/20 rounded-[4px]">
                   <Layers className="w-3.5 h-3.5 text-[#0F3D3A] shrink-0 mt-0.5" />
                   <div className="min-w-0">
                     <p className="text-[10px] text-[#525252]">Kompatibel</p>
-                    <p className="font-semibold text-xs truncate">{product.compatibility}</p>
+                    <p className="font-semibold text-xs truncate">{product.compatibility || '—'}</p>
                   </div>
                 </div>
               </div>
@@ -169,7 +183,7 @@ export function ProductDetailPage() {
             <h2 className="font-display font-bold text-base sm:text-lg text-[#171717]">
               Informasi Lengkap Produk
             </h2>
-            <p className="text-xs sm:text-sm text-[#333333] leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#333333] leading-relaxed whitespace-pre-line">
               {product.description}
             </p>
           </div>
@@ -190,6 +204,16 @@ export function ProductDetailPage() {
             </ul>
           </div>
         </div>
+
+        {/* Photo & Video Documentation Gallery */}
+        {product.gallery && product.gallery.length > 0 && (
+          <section className="nb-card p-4 sm:p-5">
+            <MediaGallerySection
+              items={product.gallery}
+              title="Galeri Dokumentasi Produk"
+            />
+          </section>
+        )}
 
         {/* Related Products */}
         {related.length > 0 && (

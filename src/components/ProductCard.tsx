@@ -18,6 +18,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <div className="border-b-2 border-[#171717] overflow-hidden shrink-0">
           <StudioImage
             src={product.imageUrl}
+            driveFileId={product.driveFileId}
             alt={product.title}
             aspectClass="aspect-[16/10]"
             className="group-hover:scale-[1.03]"

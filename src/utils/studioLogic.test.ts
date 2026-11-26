@@ -3,18 +3,26 @@ import assert from 'node:assert/strict';
 import {
   buildMediaProxyUrl,
   buildProductWhatsappMessage,
+  computeCatalogStats,
   computeOrderStats,
   filterAndSortOrders,
   filterDigitalProducts,
+  findMediaUsages,
   formatRupiah,
   formatServicePriceLabel,
   generateOrderCode,
   getProductGridColsClass,
   isValidWhatsappNumber,
+  isVideoMimeType,
   normalizeWhatsappNumber,
+  promoteGalleryItemToPrimary,
+  reorderGalleryItems,
   sanitizeExternalUrl,
   validateContactInput,
+  validateDigitalProductInput,
+  validateMediaFileBeforeUpload,
   validateOrderInput,
+  validateServiceInput,
 } from './studioLogic';
 import type { DigitalProductItem, OrderItem } from '../types/studio';
 
@@ -270,3 +278,200 @@ test('filterDigitalProducts filters by published status, category, and query and
   const hiddenPriceMsg = buildProductWhatsappMessage(sampleProducts[1]);
   assert.doesNotMatch(hiddenPriceMsg, /Rp15\.000/);
 });
+
+test('computeCatalogStats counts published, draft, and featured products and services accurately', () => {
+  const stats = computeCatalogStats(
+    [
+      { isPublished: true, isFeatured: true },
+      { isPublished: true, isFeatured: false },
+      { isPublished: false, isFeatured: false },
+    ],
+    [
+      { isPublished: true, isFeatured: true },
+      { isPublished: false, isFeatured: true },
+    ]
+  );
+
+  assert.deepEqual(stats, {
+    totalProducts: 3,
+    publishedProducts: 2,
+    draftProducts: 1,
+    featuredProducts: 1,
+    totalServices: 2,
+    publishedServices: 1,
+    draftServices: 1,
+    featuredServices: 2,
+  });
+});
+
+test('validateDigitalProductInput rejects unsafe URLs and short fields while accepting valid payload', () => {
+  const invalid = validateDigitalProductInput({
+    title: 'A',
+    slug: 'x',
+    category: 'template_ppt',
+    price: -100,
+    format: '',
+    summary: 'Hi',
+    description: 'Pendek',
+    includes: [],
+    imageUrl: 'javascript:alert(1)',
+  });
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.title);
+  assert.ok(invalid.errors.price);
+  assert.ok(invalid.errors.imageUrl);
+  assert.ok(invalid.errors.includes);
+
+  const valid = validateDigitalProductInput({
+    title: 'Template Pitch Deck Bisnis',
+    slug: 'template-pitch-deck-bisnis',
+    category: 'template_ppt',
+    price: 35000,
+    format: 'PPTX & Google Slides',
+    summary: '50 slide siap pakai untuk presentasi investor.',
+    description: 'Paket lengkap template presentasi investor dengan grafik dan tabel siap edit.',
+    includes: ['50 slide 16:9', 'Panduan warna'],
+    imageUrl: 'https://example.com/deck.jpg',
+  });
+  assert.equal(valid.valid, true);
+  assert.deepEqual(valid.errors, {});
+});
+
+test('validateServiceInput validates price range, descriptions, and deliverables', () => {
+  const invalid = validateServiceInput({
+    title: 'A',
+    slug: '',
+    category: 'web_app',
+    shortDescription: 'Singkat',
+    fullDescription: 'Terlalu singkat',
+    priceMin: 100000,
+    priceMax: 50000,
+    priceUnit: '',
+    estimatedTurnaround: '',
+    deliverables: [],
+    imageUrl: 'data:text/html,xss',
+  });
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.priceMax);
+  assert.ok(invalid.errors.imageUrl);
+  assert.ok(invalid.errors.deliverables);
+
+  const valid = validateServiceInput({
+    title: 'Pembuatan Website Profil Sekolah',
+    slug: 'website-profil-sekolah',
+    category: 'web_app',
+    shortDescription: 'Website cepat, responsif, dan mudah dikelola untuk instansi pendidikan.',
+    fullDescription: 'Layanan pembuatan website profil sekolah lengkap dengan katalog program, berita, dan formulir pendaftaran.',
+    priceMin: 150000,
+    priceMax: 300000,
+    priceUnit: 'proyek',
+    estimatedTurnaround: '3–5 hari kerja',
+    deliverables: ['Source code rapi', 'Panduan pengelolaan'],
+    imageUrl: '/src/assets/images/service_web_app_1795655644279.jpg',
+  });
+  assert.equal(valid.valid, true);
+  assert.deepEqual(valid.errors, {});
+});
+
+test('validateMediaFileBeforeUpload accepts valid images/videos and blocks oversized or unsupported files', () => {
+  assert.equal(
+    validateMediaFileBeforeUpload({ name: 'banner.webp', type: 'image/webp', size: 2_000_000 }).valid,
+    true
+  );
+  assert.equal(
+    validateMediaFileBeforeUpload({ name: 'demo.mp4', type: 'video/mp4', size: 25_000_000 }).valid,
+    true
+  );
+  assert.equal(
+    validateMediaFileBeforeUpload({ name: 'huge.png', type: 'image/png', size: 12 * 1024 * 1024 }).valid,
+    false
+  );
+  assert.equal(
+    validateMediaFileBeforeUpload({ name: 'huge.mp4', type: 'video/mp4', size: 60 * 1024 * 1024 }).valid,
+    false
+  );
+  assert.equal(
+    validateMediaFileBeforeUpload({ name: 'malware.exe', type: 'application/x-msdownload', size: 5000 }).valid,
+    false
+  );
+  assert.equal(isVideoMimeType('video/mp4'), true);
+  assert.equal(isVideoMimeType('image/png'), false);
+});
+
+test('findMediaUsages detects active references across products, services, portfolio, banner, and orders', () => {
+  const fileId = '1AbCdEfGhIjKlMnOpQr';
+  const usages = findMediaUsages(fileId, {
+    products: [
+      {
+        id: 'prod-1',
+        title: 'Template Deck',
+        driveFileId: fileId,
+        imageUrl: `/api/media/${fileId}`,
+        gallery: [{ fileId, fileName: 'slide.png', mimeType: 'image/png' }],
+      },
+    ],
+    services: [
+      {
+        id: 'svc-1',
+        title: 'Jasa Website',
+        imageUrl: '/fallback.jpg',
+        gallery: [{ fileId, fileName: 'demo.mp4', mimeType: 'video/mp4' }],
+      },
+    ],
+    portfolio: [],
+    siteSettings: {
+      heroDriveFileId: fileId,
+      heroImageUrl: `/api/media/${fileId}`,
+    },
+    orders: [
+      {
+        id: 'ord-1',
+        orderCode: 'SCS-20261126-AA11BB',
+        projectTitle: 'Profil Sekolah',
+        attachmentDriveFileId: fileId,
+      },
+    ],
+  });
+
+  assert.equal(usages.length, 5);
+  assert.ok(usages.some((u) => u.entityType === 'product' && u.role === 'primary'));
+  assert.ok(usages.some((u) => u.entityType === 'product' && u.role === 'gallery'));
+  assert.ok(usages.some((u) => u.entityType === 'service' && u.role === 'gallery'));
+  assert.ok(usages.some((u) => u.entityType === 'site_settings' && u.role === 'banner'));
+  assert.ok(usages.some((u) => u.entityType === 'order' && u.role === 'attachment'));
+});
+
+test('reorderGalleryItems and promoteGalleryItemToPrimary preserve data integrity and skip video promotion', () => {
+  const gallery = [
+    { fileId: 'file_a', fileName: 'a.jpg', mimeType: 'image/jpeg' },
+    { fileId: 'file_b', fileName: 'b.mp4', mimeType: 'video/mp4' },
+    { fileId: 'file_c', fileName: 'c.webp', mimeType: 'image/webp' },
+  ];
+
+  const reordered = reorderGalleryItems(gallery, 0, 2);
+  assert.deepEqual(
+    reordered.map((g) => g.fileId),
+    ['file_b', 'file_c', 'file_a']
+  );
+
+  // Attempting to promote a video keeps primary unchanged
+  const skipped = promoteGalleryItemToPrimary(
+    { imageUrl: '/api/media/orig_1', driveFileId: 'orig_1' },
+    gallery,
+    1
+  );
+  assert.equal(skipped.driveFileId, 'orig_1');
+
+  // Promoting an image swaps it to primary and retains previous primary in gallery
+  const promoted = promoteGalleryItemToPrimary(
+    { imageUrl: '/api/media/orig_1', driveFileId: 'orig_1' },
+    gallery,
+    2
+  );
+  assert.equal(promoted.driveFileId, 'file_c');
+  assert.equal(promoted.imageUrl, '/api/media/file_c');
+  assert.ok(promoted.gallery.some((g) => g.fileId === 'orig_1'));
+  assert.ok(!promoted.gallery.some((g) => g.fileId === 'file_c'));
+});
+
+

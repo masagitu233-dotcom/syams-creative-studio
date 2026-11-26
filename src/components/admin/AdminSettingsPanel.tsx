@@ -6,11 +6,20 @@ import {
 } from '../../services/firestoreService';
 import { formatUserFriendlyError } from '../../lib/firestoreErrors';
 import { formatDateTimeId } from '../../utils/studioLogic';
-import type { ContactMessage, SiteSettings } from '../../types/studio';
+import { STUDIO_IMAGES } from '../../data/initialCatalog';
+import { AdminImagePicker } from './AdminImagePicker';
+import type {
+  ContactMessage,
+  DriveFolderRecord,
+  MediaAsset,
+  SiteSettings,
+} from '../../types/studio';
 
 interface AdminSettingsPanelProps {
   settings: SiteSettings;
   messages: ContactMessage[];
+  media: MediaAsset[];
+  driveFolders?: DriveFolderRecord[];
   actor: { uid: string; email: string };
   onRefresh: () => Promise<void>;
   onToast: (t: { type: 'success' | 'error' | 'info'; title: string; description?: string }) => void;
@@ -19,6 +28,8 @@ interface AdminSettingsPanelProps {
 export function AdminSettingsPanel({
   settings,
   messages,
+  media,
+  driveFolders = [],
   actor,
   onRefresh,
   onToast,
@@ -135,6 +146,21 @@ export function AdminSettingsPanel({
             required
           />
         </div>
+
+        <AdminImagePicker
+          label="Banner Utama Beranda (Folder: Banner Website)"
+          imageUrl={form.heroImageUrl || STUDIO_IMAGES.hero}
+          driveFileId={form.heroDriveFileId || ''}
+          usage="hero"
+          media={media}
+          driveFolders={driveFolders}
+          actor={actor}
+          onChange={({ imageUrl, driveFileId }) =>
+            setForm((f) => ({ ...f, heroImageUrl: imageUrl, heroDriveFileId: driveFileId }))
+          }
+          onMediaUploaded={onRefresh}
+          onToast={onToast}
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">

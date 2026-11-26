@@ -18,6 +18,26 @@
   status = 200
 
 [[redirects]]
+  from = "/api/drive/upload-init"
+  to = "/.netlify/functions/drive-upload-init"
+  status = 200
+
+[[redirects]]
+  from = "/api/drive/upload-chunk"
+  to = "/.netlify/functions/drive-upload-chunk"
+  status = 200
+
+[[redirects]]
+  from = "/api/drive/folders"
+  to = "/.netlify/functions/drive-folders"
+  status = 200
+
+[[redirects]]
+  from = "/api/drive/media/:fileId"
+  to = "/.netlify/functions/drive-media-manage?fileId=:fileId"
+  status = 200
+
+[[redirects]]
   from = "/api/drive/status"
   to = "/.netlify/functions/drive-status"
   status = 200

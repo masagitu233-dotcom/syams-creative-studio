@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Search } from 'lucide-react';
-import { INITIAL_DIGITAL_PRODUCTS } from '../data/digitalProducts';
+import { useStudioData } from '../contexts/StudioDataContext';
 import { ProductCard } from '../components/ProductCard';
+import { ServiceCardSkeleton } from '../components/SkeletonCard';
 import {
+  CATALOG_GRID_COLS_CLASS,
   DIGITAL_PRODUCT_CATEGORY_LABELS,
   filterDigitalProducts,
   getProductGridColsClass,
@@ -20,6 +22,7 @@ const PRODUCT_CATEGORIES: { value: DigitalProductCategory | 'all'; label: string
 ];
 
 export function ProductsPage() {
+  const { products, loadingProducts } = useStudioData();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialCat = (searchParams.get('kategori') as DigitalProductCategory | 'all') || 'all';
   const [category, setCategory] = useState<DigitalProductCategory | 'all'>(
@@ -28,8 +31,8 @@ export function ProductsPage() {
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(
-    () => filterDigitalProducts(INITIAL_DIGITAL_PRODUCTS, { category, search }),
-    [category, search]
+    () => filterDigitalProducts(products, { category, search }),
+    [products, category, search]
   );
 
   const gridCols = getProductGridColsClass(filtered.length);
@@ -112,7 +115,13 @@ export function ProductsPage() {
         </div>
 
         {/* Fixed 5-Col Desktop / 3-Col Tablet / 2-Col Phone Grid */}
-        {filtered.length === 0 ? (
+        {loadingProducts ? (
+          <div className={`grid ${CATALOG_GRID_COLS_CLASS} gap-2.5 sm:gap-3 items-stretch`}>
+            {Array.from({ length: 5 }).map((_, idx) => (
+              <ServiceCardSkeleton key={idx} />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="nb-card p-6 text-center space-y-2">
             <h2 className="font-display font-bold text-base text-[#171717]">
               Produk tidak ditemukan
@@ -120,16 +129,18 @@ export function ProductsPage() {
             <p className="text-xs text-[#525252]">
               Coba kata kunci lain atau pilih kategori Semua Produk.
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                handleSelectCategory('all');
-                setSearch('');
-              }}
-              className="nb-btn nb-btn-mustard nb-btn-sm"
-            >
-              Reset Filter
-            </button>
+            {(category !== 'all' || search.trim() !== '') && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleSelectCategory('all');
+                  setSearch('');
+                }}
+                className="nb-btn nb-btn-mustard nb-btn-sm"
+              >
+                Reset Filter
+              </button>
+            )}
           </div>
         ) : (
           <div className={`grid ${gridCols} gap-2.5 sm:gap-3 items-stretch`}>

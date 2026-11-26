@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
 import { STUDIO_IMAGES } from '../data/initialCatalog';
-import { INITIAL_DIGITAL_PRODUCTS } from '../data/digitalProducts';
 import { Reveal } from '../components/Reveal';
 import { SectionHeader } from '../components/SectionHeader';
 import { StudioImage } from '../components/StudioImage';
@@ -87,7 +86,15 @@ const PRODUCT_FILTER_TABS: { value: DigitalProductCategory | 'all'; label: strin
 ];
 
 export function HomePage() {
-  const { services, portfolio, faqs, siteSettings, loadingServices } = useStudioData();
+  const {
+    services,
+    products,
+    portfolio,
+    faqs,
+    siteSettings,
+    loadingServices,
+    loadingProducts,
+  } = useStudioData();
   const [activePortfolio, setActivePortfolio] = useState<PortfolioItem | null>(null);
   const [productCat, setProductCat] = useState<DigitalProductCategory | 'all'>('all');
 
@@ -95,12 +102,17 @@ export function HomePage() {
   const featuredPortfolio = portfolio.slice(0, 5);
   const homeFaqs = faqs.slice(0, 4);
 
+  const allPublishedProducts = useMemo(
+    () => products.filter((p) => p.isPublished),
+    [products]
+  );
+
   const publishedProducts = useMemo(
-    () => filterDigitalProducts(INITIAL_DIGITAL_PRODUCTS, { category: productCat }),
-    [productCat]
+    () => filterDigitalProducts(products, { category: productCat }),
+    [products, productCat]
   );
   const homeProducts = publishedProducts.slice(0, 10);
-  const hasMoreProducts = INITIAL_DIGITAL_PRODUCTS.filter((p) => p.isPublished).length > 10;
+  const hasMoreProducts = allPublishedProducts.length > 10;
   const productGridCols = getProductGridColsClass(homeProducts.length);
 
   const lowestServicePrice =
@@ -163,7 +175,8 @@ export function HomePage() {
                 </div>
                 <div className="flex-1 min-h-0 flex">
                   <StudioImage
-                    src={STUDIO_IMAGES.hero}
+                    src={siteSettings.heroImageUrl || STUDIO_IMAGES.hero}
+                    driveFileId={siteSettings.heroDriveFileId || undefined}
                     alt="Ilustrasi ruang kerja kreatif SYAMS CREATIVE STUDIO"
                     aspectClass="w-full aspect-[16/10] lg:aspect-auto lg:h-full"
                     loading="eager"
@@ -230,6 +243,10 @@ export function HomePage() {
                 <ServiceCardSkeleton key={i} />
               ))}
             </div>
+          ) : featuredServices.length === 0 ? (
+            <div className="nb-card p-6 text-center text-xs sm:text-sm text-[#525252]">
+              Belum ada layanan yang dipublikasikan saat ini.
+            </div>
           ) : (
             <div className={`grid ${CATALOG_GRID_COLS_CLASS} gap-2.5 sm:gap-3 items-stretch`}>
               {featuredServices.map((service) => (
@@ -278,16 +295,39 @@ export function HomePage() {
             })}
           </div>
 
-          <div className={`grid ${productGridCols} gap-2.5 sm:gap-3 items-stretch`}>
-            {homeProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {loadingProducts ? (
+            <div className={`grid ${CATALOG_GRID_COLS_CLASS} gap-2.5 sm:gap-3 items-stretch`}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <ServiceCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : homeProducts.length === 0 ? (
+            <div className="nb-card p-6 text-center space-y-2">
+              <p className="text-xs sm:text-sm text-[#525252]">
+                Belum ada produk digital yang dipublikasikan pada kategori ini.
+              </p>
+              {productCat !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setProductCat('all')}
+                  className="nb-btn nb-btn-mustard nb-btn-sm"
+                >
+                  Lihat Semua Kategori
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className={`grid ${productGridCols} gap-2.5 sm:gap-3 items-stretch`}>
+              {homeProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
 
           {hasMoreProducts && productCat === 'all' && (
             <div className="flex justify-center pt-1">
               <Link to="/produk" className="nb-btn nb-btn-surface px-5 py-2 text-xs sm:text-sm">
-                Lihat Semua Produk Digital ({INITIAL_DIGITAL_PRODUCTS.length})
+                Lihat Semua Produk Digital ({allPublishedProducts.length})
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -411,7 +451,7 @@ export function HomePage() {
                 </div>
                 <div className="bg-white border-2 border-[#171717] rounded-[4px] p-2.5 text-center">
                   <p className="font-mono font-bold text-lg text-[#6C151E] tabular-nums">
-                    {INITIAL_DIGITAL_PRODUCTS.length}
+                    {allPublishedProducts.length}
                   </p>
                   <p className="text-[11px] text-[#525252]">Produk Digital</p>
                 </div>

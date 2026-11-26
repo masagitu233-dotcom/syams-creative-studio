@@ -12,7 +12,29 @@ export type FaqCategory = 'pemesanan' | 'harga' | 'revisi' | 'teknis';
 
 export type MediaVisibility = 'public' | 'private';
 
-export type MediaUsage = 'service' | 'portfolio' | 'hero' | 'order_attachment' | 'other';
+export type MediaUsage = 'service' | 'product' | 'portfolio' | 'hero' | 'order_attachment' | 'other';
+
+export type MediaEntityType = 'product' | 'service' | 'portfolio' | 'hero' | 'none';
+
+export interface MediaGalleryItem {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  caption?: string;
+  imageUrl?: string;
+}
+
+export interface DriveFolderRecord {
+  id: string;
+  folderKey: string;
+  folderId: string;
+  folderName: string;
+  parentFolderId?: string;
+  category: MediaUsage | 'root';
+  entityId?: string;
+  folderPath: string;
+  updatedAt?: unknown;
+}
 
 export type AccentColor = '#0F3D3A' | '#6C151E' | '#8ACCD5' | '#F3C95B';
 
@@ -52,6 +74,7 @@ export interface ServiceItem {
   accentColor: AccentColor;
   imageUrl: string;
   driveFileId?: string;
+  gallery?: MediaGalleryItem[];
   sortOrder: number;
   isFeatured: boolean;
   isPublished: boolean;
@@ -95,6 +118,7 @@ export interface PortfolioItem {
   metrics: string;
   imageUrl: string;
   driveFileId?: string;
+  gallery?: MediaGalleryItem[];
   projectUrl?: string;
   isFeatured: boolean;
   isPublished: boolean;
@@ -112,8 +136,15 @@ export interface MediaAsset {
   visibility: MediaVisibility;
   usage: MediaUsage;
   altText?: string;
+  folderId?: string;
+  folderPath?: string;
+  entityType?: MediaEntityType;
+  entityId?: string;
+  entityName?: string;
+  isPublished?: boolean;
   ownerUid: string;
   createdAt?: unknown;
+  updatedAt?: unknown;
 }
 
 export interface SiteSettings {
@@ -122,6 +153,8 @@ export interface SiteSettings {
   slogan: string;
   heroHeadline: string;
   heroSubheadline: string;
+  heroImageUrl?: string;
+  heroDriveFileId?: string;
   aboutSummary: string;
   aboutMission?: string;
   whatsappNumber: string;
@@ -132,6 +165,10 @@ export interface SiteSettings {
   tiktokUrl?: string;
   youtubeUrl?: string;
   linkedinUrl?: string;
+  servicesMigrated?: boolean;
+  productsMigrated?: boolean;
+  portfolioMigrated?: boolean;
+  faqsMigrated?: boolean;
   updatedAt?: unknown;
 }
 
@@ -151,7 +188,7 @@ export interface ActivityLog {
   actorUid: string;
   actorEmail: string;
   action: string;
-  entityType: 'order' | 'service' | 'portfolio' | 'media' | 'faq' | 'site_settings' | 'admin' | 'contact';
+  entityType: 'order' | 'service' | 'product' | 'portfolio' | 'media' | 'faq' | 'site_settings' | 'admin' | 'contact';
   entityId: string;
   summary: string;
   createdAt?: unknown;
@@ -196,7 +233,11 @@ export interface DigitalProductItem {
   description: string;
   includes: string[];
   imageUrl: string;
+  driveFileId?: string;
+  gallery?: MediaGalleryItem[];
   isFeatured: boolean;
   isPublished: boolean;
   sortOrder: number;
+  createdAt?: unknown;
+  updatedAt?: unknown;
 }

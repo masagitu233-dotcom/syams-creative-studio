@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ImageOff } from 'lucide-react';
 import { buildMediaProxyUrl, sanitizeExternalUrl } from '../utils/studioLogic';
 
@@ -25,6 +25,11 @@ export function StudioImage({
 }: StudioImageProps) {
   const [failedPrimary, setFailedPrimary] = useState(false);
   const [failedFallback, setFailedFallback] = useState(false);
+
+  useEffect(() => {
+    setFailedPrimary(false);
+    setFailedFallback(false);
+  }, [driveFileId, src]);
 
   const driveProxyUrl = driveFileId ? buildMediaProxyUrl(driveFileId, 'public') : '';
   const safeSrc = sanitizeExternalUrl(src);

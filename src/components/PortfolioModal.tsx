@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpRight, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { StudioImage } from './StudioImage';
+import { MediaGallerySection } from './MediaGallerySection';
 import { SERVICE_CATEGORY_LABELS, sanitizeExternalUrl } from '../utils/studioLogic';
 import type { PortfolioItem } from '../types/studio';
 
@@ -108,6 +109,16 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
                   {item.metrics}
                 </p>
               </div>
+
+              {item.gallery && item.gallery.length > 0 && (
+                <div className="pt-1">
+                  <MediaGallerySection
+                    items={item.gallery}
+                    title="Dokumentasi Proyek"
+                    compact
+                  />
+                </div>
+              )}
 
               <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
                 {safeProjectUrl ? (
