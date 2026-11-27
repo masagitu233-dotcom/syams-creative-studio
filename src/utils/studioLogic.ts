@@ -717,9 +717,24 @@ export function filterDigitalProducts(
   });
 }
 
+export function normalizeBrandDisplayText(text: string): string {
+  if (!text || typeof text !== 'string') return text;
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(text.trim())) return text;
+  return text
+    .replace(/\bSYAMS CREATIVE STUDIO\b/g, 'OSAMA CREATIVE STUDIO')
+    .replace(/\bSYAMS Creative Studio\b/g, 'OSAMA Creative Studio')
+    .replace(/\bSyams Creative Studio\b/g, 'Osama Creative Studio')
+    .replace(/\bSYAMS STUDIO\b/g, 'OSAMA STUDIO')
+    .replace(/\bSYAMS Studio\b/g, 'OSAMA Studio')
+    .replace(/\bSyams Studio\b/g, 'Osama Studio')
+    .replace(/\bTim SYAMS\b/g, 'Tim OSAMA')
+    .replace(/\bKlien SYAMS\b/g, 'Klien OSAMA')
+    .replace(/\bAdmin Utama SYAMS\b/g, 'Admin Utama OSAMA');
+}
+
 export function buildProductWhatsappMessage(product: DigitalProductItem): string {
   const priceText = product.showPrice ? ` (${formatRupiah(product.price)})` : '';
-  return `Halo Admin SYAMS CREATIVE STUDIO, saya ingin memesan produk digital "${product.title}"${priceText}. Mohon informasi cara pembayaran dan pengiriman filenya.`;
+  return `Halo Admin OSAMA CREATIVE STUDIO, saya ingin memesan produk digital "${product.title}"${priceText}. Mohon informasi cara pembayaran dan pengiriman filenya.`;
 }
 
 export interface CatalogDashboardStats {
@@ -1273,7 +1288,7 @@ export const VISUAL_THEME_OPTIONS: VisualThemeOptionMeta[] = [
     name: 'Neo Brutalist',
     tagline: 'Tema Bawaan Studio',
     description:
-      'Gaya ekspresif khas SYAMS CREATIVE STUDIO dengan garis tegas, bayangan offset tajam, dan palet krem-hijau-mustard kontras tinggi.',
+      'Gaya ekspresif khas OSAMA CREATIVE STUDIO dengan garis tegas, bayangan offset tajam, dan palet krem-hijau-mustard kontras tinggi.',
     traits: ['Outline tegas 2px', 'Hard offset shadow', 'Sudut tajam 4px'],
   },
   {

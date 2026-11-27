@@ -189,7 +189,7 @@ export function AdminServicesPanel({
     const resolvedFullDescription =
       form.fullDescription.trim().length >= 20
         ? form.fullDescription
-        : `${form.shortDescription.trim()} Dikerjakan secara profesional oleh tim SYAMS CREATIVE STUDIO.`;
+        : `${form.shortDescription.trim()} Dikerjakan secara profesional oleh tim OSAMA CREATIVE STUDIO.`;
 
     const validation = validateServiceInput({
       title: form.title,

@@ -192,7 +192,7 @@ export function AdminProductsPanel({
       description:
         form.description.trim().length >= 10
           ? form.description
-          : `${form.summary.trim()} Produk digital resmi SYAMS CREATIVE STUDIO.`,
+          : `${form.summary.trim()} Produk digital resmi OSAMA CREATIVE STUDIO.`,
       includes,
       imageUrl: form.imageUrl,
     });
@@ -225,7 +225,7 @@ export function AdminProductsPanel({
           description:
             form.description.trim().length >= 10
               ? form.description
-              : `${form.summary.trim()} Produk digital resmi SYAMS CREATIVE STUDIO.`,
+              : `${form.summary.trim()} Produk digital resmi OSAMA CREATIVE STUDIO.`,
           includes,
           imageUrl: form.imageUrl,
           driveFileId: form.driveFileId,

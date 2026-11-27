@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import {
   INITIAL_FAQS,
   INITIAL_PORTFOLIO,
@@ -13,6 +13,7 @@ import {
   subscribePublicServices,
   subscribeSiteSettings,
 } from '../services/firestoreService';
+import { normalizeBrandDisplayText } from '../utils/studioLogic';
 import type {
   DigitalProductItem,
   FaqItem,
@@ -157,8 +158,32 @@ export function StudioDataProvider({ children }: { children: React.ReactNode }) 
   const services = isServicesLive ? liveServices ?? [] : INITIAL_SERVICES;
   const products = isProductsLive ? liveProducts ?? [] : INITIAL_DIGITAL_PRODUCTS;
   const portfolio = isPortfolioLive ? livePortfolio ?? [] : INITIAL_PORTFOLIO;
-  const faqs = isFaqsLive ? liveFaqs ?? [] : INITIAL_FAQS;
-  const siteSettings = liveSettings ?? INITIAL_SITE_SETTINGS;
+
+  const rawFaqs = isFaqsLive ? liveFaqs ?? [] : INITIAL_FAQS;
+  const faqs = useMemo(
+    () =>
+      rawFaqs.map((item) => ({
+        ...item,
+        question: normalizeBrandDisplayText(item.question),
+        answer: normalizeBrandDisplayText(item.answer),
+      })),
+    [rawFaqs]
+  );
+
+  const rawSettings = liveSettings ?? INITIAL_SITE_SETTINGS;
+  const siteSettings = useMemo<SiteSettings>(
+    () => ({
+      ...rawSettings,
+      studioName: normalizeBrandDisplayText(rawSettings.studioName),
+      heroHeadline: normalizeBrandDisplayText(rawSettings.heroHeadline),
+      heroSubheadline: normalizeBrandDisplayText(rawSettings.heroSubheadline),
+      aboutSummary: normalizeBrandDisplayText(rawSettings.aboutSummary),
+      aboutMission: rawSettings.aboutMission
+        ? normalizeBrandDisplayText(rawSettings.aboutMission)
+        : rawSettings.aboutMission,
+    }),
+    [rawSettings]
+  );
 
   return (
     <StudioDataContext.Provider

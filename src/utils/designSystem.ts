@@ -28,7 +28,11 @@ import type {
   StudioArticleItem,
 } from '../types/design';
 import type { VisualThemeMode } from '../types/studio';
-import { normalizeVisualTheme, sanitizeExternalUrl } from './studioLogic';
+import {
+  normalizeBrandDisplayText,
+  normalizeVisualTheme,
+  sanitizeExternalUrl,
+} from './studioLogic';
 import { STUDIO_IMAGES } from '../data/initialCatalog';
 
 export const SITE_DESIGN_CACHE_KEY = 'syams_site_design_published_cache_v1';
@@ -109,7 +113,7 @@ export const HOME_SECTION_LABELS: Record<HomeSectionId, { label: string; descrip
   services: { label: 'Katalog Layanan Jasa', description: 'Menampilkan layanan jasa digital studio.' },
   products: { label: 'Katalog Produk Digital', description: 'Produk digital siap pakai beserta filter kategori.' },
   articles: { label: 'Artikel & Wawasan Studio', description: 'Blok artikel panduan, tips kreatif, dan kabar studio.' },
-  advantages: { label: 'Keunggulan Studio', description: 'Empat pilar keunggulan SYAMS CREATIVE STUDIO.' },
+  advantages: { label: 'Keunggulan Studio', description: 'Empat pilar keunggulan OSAMA CREATIVE STUDIO.' },
   portfolio: { label: 'Cuplikan Portofolio', description: 'Karya pilihan lengkap dengan modal studi kasus.' },
   procedure: { label: 'Prosedur Pemesanan', description: 'Empat langkah alur kerja dari brief hingga file final.' },
   about: { label: 'Cuplikan Profil Studio', description: 'Ringkasan profil studio, statistik, dan tombol tentang.' },
@@ -283,7 +287,7 @@ export const DEFAULT_IDENTITY_DESIGN: SiteIdentityDesignConfig = {
   faviconDriveFileId: '',
   ownerPhotoUrl: '',
   ownerPhotoDriveFileId: '',
-  ownerName: 'Tim SYAMS CREATIVE STUDIO',
+  ownerName: 'Tim OSAMA CREATIVE STUDIO',
   ownerRole: 'Founder & Creative Director',
   ownerBio:
     'Memimpin arah kreatif, kurasi editorial, dan standar kualitas proyek digital untuk lembaga, pendidik, dan pelaku usaha.',
@@ -486,7 +490,7 @@ export const DEFAULT_ARTICLES_DESIGN: ArticlesDesignConfig = {
   showInNavigation: false,
   pageTitle: 'Artikel, Panduan & Wawasan Studio',
   pageSubtitle:
-    'Kumpulan panduan ringkas seputar desain, website, presentasi, dan strategi konten dari tim SYAMS CREATIVE STUDIO.',
+    'Kumpulan panduan ringkas seputar desain, website, presentasi, dan strategi konten dari tim OSAMA CREATIVE STUDIO.',
   section: createDefaultSection({
     colsDesktop: 3,
     colsTablet: 2,
@@ -706,8 +710,10 @@ function mergeSectionConfig(
     fontFamily: safeOptionalFontKey(obj.fontFamily),
     headingSizePx: Math.round(clampNumber(obj.headingSizePx, 0, 56, base.headingSizePx)),
     descriptionSizePx: Math.round(clampNumber(obj.descriptionSizePx, 0, 24, base.descriptionSizePx)),
-    customTitle: safeStr(obj.customTitle, base.customTitle || '', 160),
-    customSubtitle: safeStr(obj.customSubtitle, base.customSubtitle || '', 300),
+    customTitle: normalizeBrandDisplayText(safeStr(obj.customTitle, base.customTitle || '', 160)),
+    customSubtitle: normalizeBrandDisplayText(
+      safeStr(obj.customSubtitle, base.customSubtitle || '', 300)
+    ),
   };
 }
 
@@ -1058,9 +1064,9 @@ export function mergeSiteDesignConfig(
       faviconDriveFileId: safeStr(rawId.faviconDriveFileId, '', 200),
       ownerPhotoUrl: sanitizeExternalUrl(safeStr(rawId.ownerPhotoUrl, '', 500)),
       ownerPhotoDriveFileId: safeStr(rawId.ownerPhotoDriveFileId, '', 200),
-      ownerName: safeStr(rawId.ownerName, base.identity.ownerName, 120),
+      ownerName: normalizeBrandDisplayText(safeStr(rawId.ownerName, base.identity.ownerName, 120)),
       ownerRole: safeStr(rawId.ownerRole, base.identity.ownerRole, 120),
-      ownerBio: safeStr(rawId.ownerBio, base.identity.ownerBio, 500),
+      ownerBio: normalizeBrandDisplayText(safeStr(rawId.ownerBio, base.identity.ownerBio, 500)),
       coverImageUrl: sanitizeExternalUrl(safeStr(rawId.coverImageUrl, '', 500)),
       coverDriveFileId: safeStr(rawId.coverDriveFileId, '', 200),
       heroImageOverrideUrl: sanitizeExternalUrl(safeStr(rawId.heroImageOverrideUrl, '', 500)),
@@ -1109,7 +1115,7 @@ export function mergeSiteDesignConfig(
       showQuickLinks: safeBool(rawFooter.showQuickLinks, base.footer.showQuickLinks),
       showSocials: safeBool(rawFooter.showSocials, base.footer.showSocials),
       showWhatsappButton: safeBool(rawFooter.showWhatsappButton, base.footer.showWhatsappButton),
-      copyrightText: safeStr(rawFooter.copyrightText, '', 160),
+      copyrightText: normalizeBrandDisplayText(safeStr(rawFooter.copyrightText, '', 160)),
       paddingYPx: Math.round(clampNumber(rawFooter.paddingYPx, 20, 88, base.footer.paddingYPx)),
       backgroundColor: safeColor(rawFooter.backgroundColor),
       textColor: safeColor(rawFooter.textColor),
@@ -1125,8 +1131,12 @@ export function mergeSiteDesignConfig(
     portfolio: mergeCatalog(obj.portfolio, base.portfolio),
     articles: {
       showInNavigation: safeBool(rawArticles.showInNavigation, base.articles.showInNavigation),
-      pageTitle: safeStr(rawArticles.pageTitle, base.articles.pageTitle, 140),
-      pageSubtitle: safeStr(rawArticles.pageSubtitle, base.articles.pageSubtitle, 320),
+      pageTitle: normalizeBrandDisplayText(
+        safeStr(rawArticles.pageTitle, base.articles.pageTitle, 140)
+      ),
+      pageSubtitle: normalizeBrandDisplayText(
+        safeStr(rawArticles.pageSubtitle, base.articles.pageSubtitle, 320)
+      ),
       section: mergeSectionConfig(rawArticles.section, base.articles.section),
       card: mergeCardConfig(rawArticles.card, base.articles.card),
       items: mergeArticlesList(rawArticles.items),

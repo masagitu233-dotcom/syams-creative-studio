@@ -245,7 +245,7 @@ export function CheckoutPage() {
           asPageTitle
           kicker="Formulir Pemesanan"
           title="Checkout Layanan Digital"
-          subtitle="Lengkapi detail kebutuhan pekerjaan Anda. Harga final tidak ditagihkan otomatis dan akan dikonfirmasi terlebih dahulu oleh admin SYAMS CREATIVE STUDIO."
+          subtitle="Lengkapi detail kebutuhan pekerjaan Anda. Harga final tidak ditagihkan otomatis dan akan dikonfirmasi terlebih dahulu oleh admin OSAMA CREATIVE STUDIO."
         />
 
         {/* Success Confirmation View */}
@@ -286,7 +286,7 @@ export function CheckoutPage() {
               <a
                 href={buildWhatsappLink(
                   siteSettings.whatsappNumber,
-                  `Halo Admin SYAMS CREATIVE STUDIO, saya baru saja mengirim pesanan dengan kode ${createdOrder.orderCode} (${createdOrder.serviceTitle} - ${createdOrder.projectTitle}). Mohon konfirmasi estimasi biaya finalnya.`
+                  `Halo Admin OSAMA CREATIVE STUDIO, saya baru saja mengirim pesanan dengan kode ${createdOrder.orderCode} (${createdOrder.serviceTitle} - ${createdOrder.projectTitle}). Mohon konfirmasi estimasi biaya finalnya.`
                 )}
                 target="_blank"
                 rel="noopener noreferrer"

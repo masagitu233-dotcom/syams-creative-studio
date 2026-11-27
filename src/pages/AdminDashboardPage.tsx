@@ -36,6 +36,7 @@ import {
   computeOrderStats,
   formatDateTimeId,
   formatRupiah,
+  normalizeBrandDisplayText,
   ORDER_STATUS_META,
 } from '../utils/studioLogic';
 import { logMediaDiagnostic } from '../utils/mediaDiagnostics';
@@ -194,7 +195,16 @@ export function AdminDashboardPage() {
       setLogs(data.logs);
       setMessages(data.messages);
       if (data.siteSettings) {
-        setSettings(data.siteSettings);
+        setSettings({
+          ...data.siteSettings,
+          studioName: normalizeBrandDisplayText(data.siteSettings.studioName),
+          heroHeadline: normalizeBrandDisplayText(data.siteSettings.heroHeadline),
+          heroSubheadline: normalizeBrandDisplayText(data.siteSettings.heroSubheadline),
+          aboutSummary: normalizeBrandDisplayText(data.siteSettings.aboutSummary),
+          aboutMission: data.siteSettings.aboutMission
+            ? normalizeBrandDisplayText(data.siteSettings.aboutMission)
+            : data.siteSettings.aboutMission,
+        });
       }
       setHasLoadedOnce(true);
       return data;
@@ -323,7 +333,7 @@ export function AdminDashboardPage() {
             <Lock className="w-4 h-4" />
           </div>
           <div className="space-y-1.5">
-            <p className="nb-kicker">SYAMS CREATIVE STUDIO</p>
+            <p className="nb-kicker">OSAMA CREATIVE STUDIO</p>
             <h1 className="font-display font-bold text-xl sm:text-2xl text-[#171717]">
               Portal Administrator Utama
             </h1>
@@ -432,7 +442,7 @@ export function AdminDashboardPage() {
         <div className="px-4 h-14 border-b-2 border-[#171717] flex items-center justify-between gap-2">
           <div className="min-w-0">
             <Link to="/" className="font-display font-bold text-sm text-[#F3C95B] leading-tight block truncate">
-              SYAMS CREATIVE STUDIO
+              OSAMA CREATIVE STUDIO
             </Link>
             <p className="text-[11px] text-[#F8F8E1]/75 truncate">Panel Admin Produksi</p>
           </div>

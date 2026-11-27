@@ -37,7 +37,7 @@ export function Footer() {
 
   const waHref = buildWhatsappLink(
     siteSettings.whatsappNumber,
-    'Halo SYAMS CREATIVE STUDIO, saya ingin berkonsultasi mengenai layanan dan produk digital.'
+    'Halo OSAMA CREATIVE STUDIO, saya ingin berkonsultasi mengenai layanan dan produk digital.'
   );
 
   const footerStyle: React.CSSProperties = {};

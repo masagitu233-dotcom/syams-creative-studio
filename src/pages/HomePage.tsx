@@ -175,7 +175,7 @@ export function HomePage() {
                       src={heroImageUrl}
                       driveFileId={heroDriveFileId}
                       cacheVersion={siteSettings.updatedAt}
-                      alt="Banner utama SYAMS CREATIVE STUDIO"
+                      alt="Banner utama OSAMA CREATIVE STUDIO"
                       aspectClass="w-full h-full"
                       loading="eager"
                     />
@@ -293,7 +293,7 @@ export function HomePage() {
                       src={heroImageUrl}
                       driveFileId={heroDriveFileId}
                       cacheVersion={siteSettings.updatedAt}
-                      alt="Ilustrasi ruang kerja kreatif SYAMS CREATIVE STUDIO"
+                      alt="Ilustrasi ruang kerja kreatif OSAMA CREATIVE STUDIO"
                       aspectClass="w-full aspect-[16/9]"
                       loading="eager"
                     />
@@ -426,7 +426,7 @@ export function HomePage() {
                           src={heroImageUrl}
                           driveFileId={heroDriveFileId}
                           cacheVersion={siteSettings.updatedAt}
-                          alt="Ilustrasi ruang kerja kreatif SYAMS CREATIVE STUDIO"
+                          alt="Ilustrasi ruang kerja kreatif OSAMA CREATIVE STUDIO"
                           aspectClass="w-full aspect-[16/10] lg:aspect-auto lg:h-full"
                           loading="eager"
                         />
@@ -533,7 +533,7 @@ export function HomePage() {
               <FadeScroll index={0}>
                 <SectionHeader
                   kicker="Layanan Jasa Utama"
-                  title={cfg.customTitle?.trim() || 'Lima Layanan Digital SYAMS Creative Studio'}
+                  title={cfg.customTitle?.trim() || 'Lima Layanan Digital OSAMA Creative Studio'}
                   subtitle={
                     cfg.customSubtitle?.trim() ||
                     'Harga bersifat estimasi awal dan dikelola dinamis. Klik Detail untuk melihat cakupan lengkap.'
@@ -819,7 +819,7 @@ export function HomePage() {
               <FadeScroll index={0} className="relative z-10">
                 <SectionHeader
                   kicker="Keunggulan Kami"
-                  title={cfg.customTitle?.trim() || 'Kenapa Memilih SYAMS Creative Studio'}
+                  title={cfg.customTitle?.trim() || 'Kenapa Memilih OSAMA Creative Studio'}
                   subtitle={cfg.customSubtitle?.trim() || undefined}
                   align={cfg.textAlign}
                   headingSizePx={cfg.headingSizePx}
@@ -1093,7 +1093,7 @@ export function HomePage() {
                     style={sectionBtnStyle}
                     className="nb-btn nb-btn-primary px-4 py-2 text-xs sm:text-sm w-full"
                   >
-                    Tentang SYAMS Studio
+                    Tentang OSAMA Studio
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 </FadeScroll>
@@ -1185,7 +1185,7 @@ export function HomePage() {
                       }}
                     >
                       {cfg.customTitle?.trim() ||
-                        'Siap Mewujudkan Ide Digital Anda Bersama SYAMS CREATIVE STUDIO?'}
+                        'Siap Mewujudkan Ide Digital Anda Bersama OSAMA CREATIVE STUDIO?'}
                     </h2>
                     <p
                       className="text-xs sm:text-sm text-[#404040]"

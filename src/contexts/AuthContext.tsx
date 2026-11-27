@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await ensureAdminRecord({
             uid: currentUser.uid,
             email: currentUser.email || BOOTSTRAP_ADMIN_EMAIL,
-            displayName: currentUser.displayName || 'Admin Utama SYAMS',
+            displayName: currentUser.displayName || 'Admin Utama OSAMA',
           });
         } catch {
           // Non-blocking if already handled

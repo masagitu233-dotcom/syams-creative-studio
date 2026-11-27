@@ -201,7 +201,7 @@ export function CustomerOrdersPage() {
                 ORDER_STATUS_META[order.status] || ORDER_STATUS_META.menunggu_konfirmasi;
               const waHref = buildWhatsappLink(
                 siteSettings.whatsappNumber,
-                `Halo Admin SYAMS CREATIVE STUDIO, saya ingin menanyakan progres pesanan ${order.orderCode} (${order.projectTitle}).`
+                `Halo Admin OSAMA CREATIVE STUDIO, saya ingin menanyakan progres pesanan ${order.orderCode} (${order.projectTitle}).`
               );
 
               return (

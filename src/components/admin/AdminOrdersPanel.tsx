@@ -249,7 +249,7 @@ export function AdminOrdersPanel({ orders, actor, onRefresh, onToast }: AdminOrd
                           <a
                             href={buildWhatsappLink(
                               order.customerWhatsapp,
-                              `Halo ${order.customerName}, terkait pesanan ${order.orderCode} (${order.projectTitle}) di SYAMS CREATIVE STUDIO...`
+                              `Halo ${order.customerName}, terkait pesanan ${order.orderCode} (${order.projectTitle}) di OSAMA CREATIVE STUDIO...`
                             )}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -373,7 +373,7 @@ export function AdminOrdersPanel({ orders, actor, onRefresh, onToast }: AdminOrd
                   <a
                     href={buildWhatsappLink(
                       editingOrder.customerWhatsapp,
-                      `Halo ${editingOrder.customerName}, terkait pesanan ${editingOrder.orderCode} (${editingOrder.projectTitle}) di SYAMS CREATIVE STUDIO...`
+                      `Halo ${editingOrder.customerName}, terkait pesanan ${editingOrder.orderCode} (${editingOrder.projectTitle}) di OSAMA CREATIVE STUDIO...`
                     )}
                     target="_blank"
                     rel="noopener noreferrer"

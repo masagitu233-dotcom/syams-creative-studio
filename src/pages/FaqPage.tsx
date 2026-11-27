@@ -124,7 +124,7 @@ export function FaqPage() {
                   Masih ada pertanyaan lain?
                 </h2>
                 <p className="text-xs sm:text-sm text-[#404040]">
-                  Tim SYAMS CREATIVE STUDIO siap membantu menjawab kebutuhan spesifik proyek Anda.
+                  Tim OSAMA CREATIVE STUDIO siap membantu menjawab kebutuhan spesifik proyek Anda.
                 </p>
               </div>
               <Link to="/kontak" className="nb-btn nb-btn-primary nb-btn-md w-full sm:w-auto shrink-0">

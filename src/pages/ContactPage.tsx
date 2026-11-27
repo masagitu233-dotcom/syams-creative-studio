@@ -29,7 +29,7 @@ export function ContactPage() {
 
   const waHref = buildWhatsappLink(
     siteSettings.whatsappNumber,
-    'Halo SYAMS CREATIVE STUDIO, saya ingin menanyakan detail layanan.'
+    'Halo OSAMA CREATIVE STUDIO, saya ingin menanyakan detail layanan.'
   );
 
   const socials = [
@@ -57,7 +57,7 @@ export function ContactPage() {
       pushToast({
         type: 'success',
         title: 'Pesan Terkirim',
-        description: 'Terima kasih, pesan Anda sudah diterima oleh tim SYAMS CREATIVE STUDIO.',
+        description: 'Terima kasih, pesan Anda sudah diterima oleh tim OSAMA CREATIVE STUDIO.',
       });
     } catch (error) {
       pushToast({

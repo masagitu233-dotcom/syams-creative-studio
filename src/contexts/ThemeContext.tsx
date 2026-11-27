@@ -41,7 +41,7 @@ function ThemeLoadingShell() {
       data-testid="theme-loading-shell"
       role="status"
       aria-live="polite"
-      aria-label="Memuat tampilan SYAMS CREATIVE STUDIO"
+      aria-label="Memuat tampilan OSAMA CREATIVE STUDIO"
       className="min-h-screen w-full flex flex-col items-center justify-center px-6"
       style={{ backgroundColor: '#F6F6F2', color: '#171717' }}
     >
@@ -50,11 +50,11 @@ function ThemeLoadingShell() {
           className="w-10 h-10 rounded-lg flex items-center justify-center font-display font-bold text-sm tracking-tight"
           style={{ backgroundColor: '#0F3D3A', color: '#F6F6F2' }}
         >
-          SC
+          OC
         </div>
         <div className="text-center space-y-1">
           <p className="font-display font-bold text-sm tracking-tight text-[#171717]">
-            SYAMS CREATIVE STUDIO
+            OSAMA CREATIVE STUDIO
           </p>
           <p className="text-xs text-[#525252]">Menyiapkan tampilan studio...</p>
         </div>

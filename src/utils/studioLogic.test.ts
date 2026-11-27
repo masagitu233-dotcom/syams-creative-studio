@@ -24,6 +24,7 @@ import {
   isValidVisualTheme,
   isValidWhatsappNumber,
   isVideoMimeType,
+  normalizeBrandDisplayText,
   normalizeMediaCacheVersion,
   normalizeVisualTheme,
   normalizeWhatsappNumber,
@@ -839,6 +840,24 @@ test('isPublicPublishedMediaAsset and canDeleteMediaAsset enforce draft visibili
   ]);
   assert.equal(blocked.allowed, false);
   assert.ok(blocked.reason && blocked.reason.includes('1 konten aktif'));
+});
+
+test('normalizeBrandDisplayText updates legacy brand names to OSAMA CREATIVE STUDIO while preserving URLs and emails', () => {
+  assert.equal(normalizeBrandDisplayText('SYAMS CREATIVE STUDIO'), 'OSAMA CREATIVE STUDIO');
+  assert.equal(
+    normalizeBrandDisplayText('Lima Layanan Digital SYAMS Creative Studio'),
+    'Lima Layanan Digital OSAMA Creative Studio'
+  );
+  assert.equal(
+    normalizeBrandDisplayText('© 2026 SYAMS CREATIVE STUDIO. Hubungi halo@syamscreativestudio.id'),
+    '© 2026 OSAMA CREATIVE STUDIO. Hubungi halo@syamscreativestudio.id'
+  );
+  assert.equal(
+    normalizeBrandDisplayText('https://instagram.com/syamscreativestudio'),
+    'https://instagram.com/syamscreativestudio'
+  );
+  assert.equal(normalizeBrandDisplayText('Tim SYAMS CREATIVE STUDIO'), 'Tim OSAMA CREATIVE STUDIO');
+  assert.equal(normalizeBrandDisplayText('Tentang SYAMS Studio'), 'Tentang OSAMA Studio');
 });
 
 

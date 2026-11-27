@@ -1194,7 +1194,7 @@ export function AdminDesignStudioPanel({
                   usage="hero"
                   entityKey="design-logo"
                   allowEmpty
-                  emptyHint="Kosongkan untuk memakai monogram SC bawaan SYAMS."
+                  emptyHint="Kosongkan untuk menampilkan teks OSAMA CREATIVE STUDIO hingga logo baru diunggah."
                   imageUrl={draft.identity.logoUrl}
                   driveFileId={draft.identity.logoDriveFileId}
                   media={media}

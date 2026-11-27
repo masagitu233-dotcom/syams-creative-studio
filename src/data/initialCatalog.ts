@@ -11,13 +11,13 @@ export const STUDIO_IMAGES = {
 
 export const INITIAL_SITE_SETTINGS: SiteSettings = {
   id: 'general',
-  studioName: 'SYAMS CREATIVE STUDIO',
+  studioName: 'OSAMA CREATIVE STUDIO',
   slogan: 'Ide Kreatif, Solusi Digital.',
   heroHeadline: 'Ide Kreatif, Solusi Digital untuk Karya yang Tegas dan Berdampak.',
   heroSubheadline:
     'Dari pembuatan website, editing video, desain poster, materi presentasi edukatif, hingga penyusunan naskah pidato dan khutbah—semua dikerjakan dengan standar editorial modern dan alur pemesanan transparan.',
   aboutSummary:
-    'SYAMS CREATIVE STUDIO adalah studio jasa digital independen yang membantu pelajar, pendidik, organisasi, lembaga dakwah, dan pelaku usaha membangun kehadiran digital yang rapi, komunikatif, dan mudah diakses.',
+    'OSAMA CREATIVE STUDIO adalah studio jasa digital independen yang membantu pelajar, pendidik, organisasi, lembaga dakwah, dan pelaku usaha membangun kehadiran digital yang rapi, komunikatif, dan mudah diakses.',
   aboutMission:
     'Menghadirkan layanan kreatif berkualitas studio dengan estimasi harga terjangkau, komunikasi terbuka, serta standar pengerjaan yang tepat waktu tanpa proses berbelit.',
   whatsappNumber: '6285156002480',
@@ -284,7 +284,7 @@ export const INITIAL_FAQS: FaqItem[] = [
     id: 'faq-estimasi-harga',
     question: 'Apakah harga yang tampil di katalog sudah merupakan harga final?',
     answer:
-      'Harga yang tampil pada katalog merupakan estimasi awal sebagai panduan transparan. Harga final akan dikonfirmasi oleh admin SYAMS CREATIVE STUDIO melalui WhatsApp dan dashboard pesanan setelah kami meninjau detail brief, tingkat kerumitan, jumlah halaman/durasi, serta tenggat waktu yang Anda ajukan.',
+      'Harga yang tampil pada katalog merupakan estimasi awal sebagai panduan transparan. Harga final akan dikonfirmasi oleh admin OSAMA CREATIVE STUDIO melalui WhatsApp dan dashboard pesanan setelah kami meninjau detail brief, tingkat kerumitan, jumlah halaman/durasi, serta tenggat waktu yang Anda ajukan.',
     category: 'harga',
     sortOrder: 1,
     isPublished: true,
@@ -320,7 +320,7 @@ export const INITIAL_FAQS: FaqItem[] = [
     id: 'faq-lampiran-file',
     question: 'Bagaimana keamanan berkas materi atau lampiran yang saya kirimkan?',
     answer:
-      'Lampiran brief pelanggan disimpan sebagai berkas privat yang terpisah dari media publik studio. Hanya Anda selaku pemilik pesanan dan administrator resmi SYAMS CREATIVE STUDIO yang memiliki akses untuk meninjau berkas tersebut.',
+      'Lampiran brief pelanggan disimpan sebagai berkas privat yang terpisah dari media publik studio. Hanya Anda selaku pemilik pesanan dan administrator resmi OSAMA CREATIVE STUDIO yang memiliki akses untuk meninjau berkas tersebut.',
     category: 'teknis',
     sortOrder: 5,
     isPublished: true,

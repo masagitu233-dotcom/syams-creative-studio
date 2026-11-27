@@ -157,14 +157,14 @@ export function AboutPage() {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-[#0F3D3A] text-[#F3C95B] font-display font-bold text-2xl">
-                    SC
+                    OC
                   </div>
                 )}
               </div>
               <div className={`space-y-1.5 flex-1 ${alignClass}`}>
                 <p className="nb-kicker">Profil Pemilik &amp; Pengarah Kreatif</p>
                 <h2 className="font-display font-bold text-lg sm:text-xl text-[#171717]">
-                  {idCfg.ownerName || 'Tim SYAMS CREATIVE STUDIO'}
+                  {idCfg.ownerName || 'Tim OSAMA CREATIVE STUDIO'}
                 </h2>
                 <p className="text-xs font-mono font-semibold text-[#0F3D3A]">
                   {idCfg.ownerRole || 'Founder & Creative Director'}

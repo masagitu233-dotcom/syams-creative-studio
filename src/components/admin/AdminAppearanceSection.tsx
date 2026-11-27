@@ -40,7 +40,7 @@ function ThemeMiniPreview({ mode }: { mode: VisualThemeMode }) {
             className="font-display font-bold text-[9px] tracking-tight"
             style={{ color: '#171717' }}
           >
-            SYAMS STUDIO
+            OSAMA STUDIO
           </span>
           <div className="flex items-center gap-1">
             <span className="w-5 h-1.5" style={{ backgroundColor: '#171717' }} />
@@ -152,7 +152,7 @@ function ThemeMiniPreview({ mode }: { mode: VisualThemeMode }) {
           className="font-display font-bold text-[9px] tracking-tight"
           style={{ color: '#0F3D3A' }}
         >
-          SYAMS STUDIO
+          OSAMA STUDIO
         </span>
         <div className="flex items-center gap-1.5">
           <span

@@ -117,7 +117,7 @@ export function AdminPortfolioPanel({
     e.preventDefault();
     const resolvedOutcome = form.outcome.trim() || form.summary.trim();
     const resolvedMetrics = form.metrics.trim() || 'Selesai sesuai target klien';
-    const resolvedClient = form.clientName.trim() || 'Klien SYAMS';
+    const resolvedClient = form.clientName.trim() || 'Klien OSAMA';
     const validation = validatePortfolioInput({
       title: form.title,
       clientName: resolvedClient,

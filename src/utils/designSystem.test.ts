@@ -320,3 +320,27 @@ test('sanitizeSiteDesignForFirestore removes undefined keys and enforces status 
   assert.equal('heroLayout' in payload.home.sections.services, false);
   assert.equal('updatedAt' in payload, false);
 });
+
+test('mergeSiteDesignConfig normalizes legacy brand display text to OSAMA CREATIVE STUDIO while preserving custom URLs', () => {
+  const merged = mergeSiteDesignConfig(
+    {
+      schemaVersion: 2,
+      identity: {
+        ownerName: 'Tim SYAMS CREATIVE STUDIO',
+        logoUrl: 'https://syamscreativestudio.netlify.app/logo.png',
+      },
+      footer: {
+        copyrightText: '© 2026 SYAMS CREATIVE STUDIO.',
+      },
+      articles: {
+        pageSubtitle: 'Panduan dari tim SYAMS CREATIVE STUDIO.',
+      },
+    },
+    'published'
+  );
+
+  assert.equal(merged.identity.ownerName, 'Tim OSAMA CREATIVE STUDIO');
+  assert.equal(merged.identity.logoUrl, 'https://syamscreativestudio.netlify.app/logo.png');
+  assert.equal(merged.footer.copyrightText, '© 2026 OSAMA CREATIVE STUDIO.');
+  assert.equal(merged.articles.pageSubtitle, 'Panduan dari tim OSAMA CREATIVE STUDIO.');
+});

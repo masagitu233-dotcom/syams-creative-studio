@@ -124,7 +124,7 @@ export function StudioImage({
         <p className="text-[11px] text-[#525252] mt-1 max-w-[30ch] line-clamp-2">
           {showErrorDetails
             ? probeResult?.summary || 'Media Google Drive tidak dapat diakses.'
-            : 'Ilustrasi SYAMS Creative Studio'}
+            : 'Ilustrasi OSAMA Creative Studio'}
         </p>
       </div>
     );
