@@ -441,6 +441,11 @@ export function AdminAppearanceSection({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Link to="/admin/desain" className="nb-btn nb-btn-mustard nb-btn-sm">
+            <Palette className="w-3.5 h-3.5" />
+            Buka Website Design Studio
+          </Link>
+
           <button
             type="button"
             onClick={handlePreview}

@@ -352,10 +352,39 @@ service cloud.firestore {
         isValidId(data.actorUid) &&
         data.actorEmail is string && data.actorEmail.size() >= 5 && data.actorEmail.size() <= 200 &&
         data.action is string && data.action.size() >= 2 && data.action.size() <= 80 &&
-        data.entityType in ['order', 'service', 'product', 'portfolio', 'media', 'faq', 'site_settings', 'admin', 'contact'] &&
+        data.entityType in ['order', 'service', 'product', 'portfolio', 'media', 'faq', 'site_settings', 'site_design', 'admin', 'contact'] &&
         data.entityId is string && data.entityId.size() >= 1 && data.entityId.size() <= 128 &&
         data.summary is string && data.summary.size() >= 3 && data.summary.size() <= 400 &&
         data.createdAt is timestamp;
+    }
+
+    function isValidSiteDesign(data, designId) {
+      return data.keys().hasAll([
+          'schemaVersion', 'status', 'global', 'identity', 'header', 'footer',
+          'home', 'products', 'services', 'portfolio', 'articles', 'otherPages',
+          'responsive', 'updatedBy', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'schemaVersion', 'status', 'global', 'identity', 'header', 'footer',
+          'home', 'products', 'services', 'portfolio', 'articles', 'otherPages',
+          'responsive', 'updatedBy', 'updatedAt'
+        ]) &&
+        data.schemaVersion is number && data.schemaVersion >= 1 && data.schemaVersion <= 10 &&
+        data.status in ['published', 'draft', 'previous'] &&
+        data.status == designId &&
+        data.global is map &&
+        data.identity is map &&
+        data.header is map &&
+        data.footer is map &&
+        data.home is map &&
+        data.products is map &&
+        data.services is map &&
+        data.portfolio is map &&
+        data.articles is map &&
+        data.otherPages is map &&
+        data.responsive is map &&
+        data.updatedBy is string && data.updatedBy.size() >= 1 && data.updatedBy.size() <= 200 &&
+        data.updatedAt is timestamp;
     }
 
     function isValidContactMessage(data) {
@@ -583,6 +612,30 @@ service cloud.firestore {
           'address', 'operatingHours', 'instagramUrl', 'tiktokUrl', 'youtubeUrl',
           'linkedinUrl', 'servicesMigrated', 'productsMigrated', 'portfolioMigrated',
           'faqsMigrated', 'visualTheme', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // 7b. Site Design Studio (Published config public get; Draft & Previous strictly Admin-only)
+    match /site_design/{designId} {
+      allow get: if isValidId(designId) && (designId == 'published' || isAdmin());
+      allow list: if false;
+      allow create: if isVerifiedUser() &&
+        isValidId(designId) &&
+        designId in ['published', 'draft', 'previous'] &&
+        isValidSiteDesign(incoming(), designId) &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() &&
+        isValidId(designId) &&
+        designId in ['published', 'draft', 'previous'] &&
+        isValidSiteDesign(incoming(), designId) &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'schemaVersion', 'status', 'global', 'identity', 'header', 'footer',
+          'home', 'products', 'services', 'portfolio', 'articles', 'otherPages',
+          'responsive', 'updatedBy', 'updatedAt'
         ]);
       allow delete: if false;
     }

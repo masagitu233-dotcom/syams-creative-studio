@@ -3,6 +3,7 @@ import {
   classifyDriveError,
   createDriveClient,
   deleteDriveFile,
+  extractMediaParamsFromEvent,
   isValidDriveId,
   replaceDriveFileContent,
   requireVerifiedAdmin,
@@ -29,7 +30,11 @@ export async function handler(event: NetlifyEvent): Promise<NetlifyResponse> {
     };
   }
 
-  const fileId = (event.queryStringParameters?.fileId || '').trim();
+  let { fileId } = extractMediaParamsFromEvent(event);
+  if (!fileId && typeof event.path === 'string') {
+    const m = event.path.match(/\/(?:api\/drive\/media|\.netlify\/functions\/drive-media-manage)\/([a-zA-Z0-9_\-]{3,200})/);
+    if (m?.[1]) fileId = decodeURIComponent(m[1]).trim();
+  }
   if (!isValidDriveId(fileId)) {
     return {
       statusCode: 400,
@@ -81,6 +86,7 @@ export async function handler(event: NetlifyEvent): Promise<NetlifyResponse> {
       if (newName) {
         await drive.files.update({
           fileId,
+          supportsAllDrives: true,
           requestBody: { name: newName },
           fields: 'id,name',
         });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, CheckCircle2, Clock, Mail, MapPin, Phone, Send } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
+import { useDesign } from '../contexts/DesignContext';
 import { submitContactMessage } from '../services/firestoreService';
 import { formatUserFriendlyError } from '../lib/firestoreErrors';
 import {
@@ -8,11 +9,14 @@ import {
   sanitizeHttpUrl,
   validateContactInput,
 } from '../utils/studioLogic';
-import { Reveal } from '../components/Reveal';
+import { FadeScroll } from '../components/FadeScroll';
 import { SectionHeader } from '../components/SectionHeader';
 
 export function ContactPage() {
   const { siteSettings, pushToast } = useStudioData();
+  const { design, viewport } = useDesign();
+  const cfg = design.otherPages.contact;
+  const padY = Math.round(cfg.paddingYPx * design.responsive[viewport].sectionPaddingScale);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -66,21 +70,46 @@ export function ContactPage() {
     }
   }
 
+  const isSplit = cfg.layout !== 'stacked' && viewport === 'desktop';
+  const formFirst = cfg.layout === 'form_left';
+
   return (
-    <div className="nb-section">
-      <div className="nb-container space-y-6">
-        <Reveal>
+    <div
+      className="nb-section"
+      style={{
+        paddingTop: `${padY}px`,
+        paddingBottom: `${padY}px`,
+        ...(cfg.backgroundColor ? { backgroundColor: cfg.backgroundColor } : {}),
+      }}
+    >
+      <div
+        className="nb-container space-y-6"
+        style={{
+          maxWidth: `${cfg.maxWidthPx > 0 ? cfg.maxWidthPx : design.global.containerMaxWidthPx}px`,
+        }}
+      >
+        <FadeScroll index={0}>
           <SectionHeader
             asPageTitle
             kicker="Hubungi Studio"
             title="Diskusikan Ide dan Kebutuhan Proyek Anda"
             subtitle="Kirimkan pertanyaan melalui formulir di bawah atau hubungi admin secara langsung melalui WhatsApp resmi studio."
           />
-        </Reveal>
+        </FadeScroll>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-stretch">
+        <div
+          className={`grid gap-4 sm:gap-5 items-stretch ${
+            isSplit ? 'grid-cols-12' : 'grid-cols-1'
+          }`}
+        >
           {/* Contact Info Panel */}
-          <div className="lg:col-span-5 flex">
+          <FadeScroll
+            index={0}
+            columnsPerRow={2}
+            className={`${isSplit ? 'col-span-5' : ''} ${
+              formFirst && isSplit ? 'order-2' : 'order-1'
+            } flex`}
+          >
             <div className="nb-card p-4 sm:p-5 space-y-4 w-full flex flex-col justify-between">
               <div className="space-y-4">
                 <h2 className="font-display font-bold text-lg text-[#171717]">
@@ -137,7 +166,7 @@ export function ContactPage() {
                   <ArrowUpRight className="w-4 h-4" />
                 </a>
 
-                {socials.length > 0 && (
+                {cfg.showSocials && socials.length > 0 && (
                   <div className="pt-3 border-t border-[#171717]/15 space-y-1.5">
                     <p className="text-[11px] font-semibold text-[#525252]">Media Sosial</p>
                     <div className="flex flex-wrap gap-3">
@@ -157,10 +186,16 @@ export function ContactPage() {
                 )}
               </div>
             </div>
-          </div>
+          </FadeScroll>
 
           {/* Contact Form */}
-          <div className="lg:col-span-7 flex">
+          <FadeScroll
+            index={1}
+            columnsPerRow={2}
+            className={`${isSplit ? 'col-span-7' : ''} ${
+              formFirst && isSplit ? 'order-1' : 'order-2'
+            } flex`}
+          >
             <div className="nb-card p-4 sm:p-5 w-full">
               {submitted ? (
                 <div className="py-6 text-center space-y-3">
@@ -290,7 +325,7 @@ export function ContactPage() {
                 </form>
               )}
             </div>
-          </div>
+          </FadeScroll>
         </div>
       </div>
     </div>

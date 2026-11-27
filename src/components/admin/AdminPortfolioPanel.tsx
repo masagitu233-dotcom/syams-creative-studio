@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Images, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   deletePortfolioByAdmin,
   savePortfolioByAdmin,
 } from '../../services/firestoreService';
 import { formatUserFriendlyError } from '../../lib/firestoreErrors';
-import { SERVICE_CATEGORY_LABELS } from '../../utils/studioLogic';
+import {
+  SERVICE_CATEGORY_LABELS,
+  validatePortfolioInput,
+} from '../../utils/studioLogic';
 import { STUDIO_IMAGES } from '../../data/initialCatalog';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { StudioImage } from '../StudioImage';
 import { AdminImagePicker } from './AdminImagePicker';
 import type {
   DriveFolderRecord,
@@ -55,12 +59,29 @@ export function AdminPortfolioPanel({
 }: AdminPortfolioPanelProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [savedBaseline, setSavedBaseline] = useState<{
+    imageUrl: string;
+    driveFileId: string;
+    gallery: MediaGalleryItem[];
+  }>({
+    imageUrl: EMPTY_FORM.imageUrl,
+    driveFileId: '',
+    gallery: [],
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [failedThumbs, setFailedThumbs] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PortfolioItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   function openNew() {
     setForm({ ...EMPTY_FORM, sortOrder: items.length + 1 });
+    setSavedBaseline({
+      imageUrl: EMPTY_FORM.imageUrl,
+      driveFileId: '',
+      gallery: [],
+    });
+    setFormErrors({});
     setFormOpen(true);
   }
 
@@ -83,33 +104,56 @@ export function AdminPortfolioPanel({
       isPublished: item.isPublished,
       sortOrder: item.sortOrder,
     });
+    setSavedBaseline({
+      imageUrl: item.imageUrl,
+      driveFileId: item.driveFileId || '',
+      gallery: item.gallery || [],
+    });
+    setFormErrors({});
     setFormOpen(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (form.title.trim().length < 3 || form.summary.trim().length < 10) {
+    const resolvedOutcome = form.outcome.trim() || form.summary.trim();
+    const resolvedMetrics = form.metrics.trim() || 'Selesai sesuai target klien';
+    const resolvedClient = form.clientName.trim() || 'Klien SYAMS';
+    const validation = validatePortfolioInput({
+      title: form.title,
+      clientName: resolvedClient,
+      category: form.category,
+      year: form.year || '2026',
+      summary: form.summary,
+      outcome: resolvedOutcome,
+      metrics: resolvedMetrics,
+      imageUrl: form.imageUrl,
+      projectUrl: form.projectUrl,
+    });
+
+    if (!validation.valid) {
+      setFormErrors(validation.errors);
       onToast({
         type: 'error',
         title: 'Data Portofolio Belum Lengkap',
-        description: 'Isi judul minimal 3 karakter dan ringkasan minimal 10 karakter.',
+        description: Object.values(validation.errors)[0],
       });
       return;
     }
 
+    setFormErrors({});
     setSaving(true);
     try {
       await savePortfolioByAdmin(
         {
           id: form.id || undefined,
           title: form.title,
-          clientName: form.clientName || 'Klien SYAMS',
+          clientName: resolvedClient,
           category: form.category,
           year: form.year || '2026',
           summary: form.summary,
           challenge: form.challenge,
-          outcome: form.outcome || form.summary,
-          metrics: form.metrics || 'Selesai sesuai target klien',
+          outcome: resolvedOutcome,
+          metrics: resolvedMetrics,
           imageUrl: form.imageUrl,
           driveFileId: form.driveFileId,
           gallery: form.gallery,
@@ -125,7 +169,7 @@ export function AdminPortfolioPanel({
       onToast({
         type: 'success',
         title: 'Portofolio Tersimpan',
-        description: 'Karya berhasil diperbarui pada Firestore.',
+        description: 'Karya dan thumbnail berhasil diperbarui pada Firestore.',
       });
     } catch (err) {
       onToast({
@@ -305,6 +349,11 @@ export function AdminPortfolioPanel({
             label="Foto Utama & Galeri Dokumentasi Proyek (Google Drive)"
             imageUrl={form.imageUrl}
             driveFileId={form.driveFileId}
+            savedImageUrl={savedBaseline.imageUrl}
+            savedDriveFileId={savedBaseline.driveFileId}
+            savedGallery={savedBaseline.gallery}
+            entityKey={form.id || 'new-portfolio'}
+            entityPublished={form.isPublished}
             usage="portfolio"
             media={media}
             driveFolders={driveFolders}
@@ -313,12 +362,18 @@ export function AdminPortfolioPanel({
             gallery={form.gallery}
             onGalleryChange={(gallery) => setForm((f) => ({ ...f, gallery }))}
             actor={actor}
-            onChange={({ imageUrl, driveFileId }) =>
-              setForm((f) => ({ ...f, imageUrl, driveFileId }))
-            }
+            onChange={({ imageUrl, driveFileId }) => {
+              setForm((f) => ({ ...f, imageUrl, driveFileId }));
+              if (formErrors.imageUrl) {
+                setFormErrors((prev) => ({ ...prev, imageUrl: '' }));
+              }
+            }}
             onMediaUploaded={onRefresh}
             onToast={onToast}
           />
+          {formErrors.imageUrl && (
+            <p className="text-[11px] font-semibold text-[#6C151E]">{formErrors.imageUrl}</p>
+          )}
 
           <div className="space-y-1">
             <label htmlFor="pf-url" className="block text-xs font-bold">
@@ -332,6 +387,9 @@ export function AdminPortfolioPanel({
               placeholder="https://..."
               className="nb-input text-sm"
             />
+            {formErrors.projectUrl && (
+              <p className="text-[11px] font-semibold text-[#6C151E]">{formErrors.projectUrl}</p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
@@ -376,50 +434,89 @@ export function AdminPortfolioPanel({
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 items-stretch">
-        {items.map((item) => (
-          <div key={item.id} className="nb-card p-4 h-full flex flex-col justify-between gap-3">
-            <div className="space-y-1.5">
-              <p className="text-[11px] text-[#525252] truncate">
-                {SERVICE_CATEGORY_LABELS[item.category]} · {item.clientName} · {item.year}
-              </p>
-              <h3 className="font-display font-bold text-sm sm:text-base text-[#171717] line-clamp-2 min-h-[2.4rem]">
-                {item.title}
-              </h3>
-              <p className="text-xs text-[#404040] line-clamp-2">{item.summary}</p>
-              <p className="text-xs font-semibold text-[#0F3D3A] pt-0.5 line-clamp-1">
-                {item.metrics}
-              </p>
-            </div>
+        {items.map((item) => {
+          const galleryCount = item.gallery?.length || 0;
+          const isBroken = Boolean(failedThumbs[item.id]);
+          return (
+            <div key={item.id} className="nb-card overflow-hidden h-full flex flex-col justify-between">
+              <div>
+                <div className="relative border-b-2 border-[#171717] bg-[#F1F1D3]">
+                  <StudioImage
+                    src={item.imageUrl}
+                    driveFileId={item.driveFileId}
+                    cacheVersion={item.updatedAt}
+                    alt={item.title}
+                    aspectClass="aspect-[16/10]"
+                    onStatusChange={(status) => {
+                      setFailedThumbs((prev) => {
+                        const nextErr = status === 'error';
+                        if (Boolean(prev[item.id]) === nextErr) return prev;
+                        return { ...prev, [item.id]: nextErr };
+                      });
+                    }}
+                  />
+                  {item.driveFileId && (
+                    <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-[#0F3D3A] text-[#F3C95B] border border-[#171717] font-mono text-[9px] font-bold rounded-[2px]">
+                      DRIVE
+                    </span>
+                  )}
+                  {galleryCount > 0 && (
+                    <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 bg-[#171717]/90 text-[#F8F8E1] font-mono text-[9px] font-bold rounded-[2px] inline-flex items-center gap-1">
+                      <Images className="w-2.5 h-2.5 text-[#F3C95B]" />+{galleryCount}
+                    </span>
+                  )}
+                  {isBroken && (
+                    <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-[#6C151E] text-[#F8F8E1] border border-[#171717] font-mono text-[9px] font-bold rounded-[2px] inline-flex items-center gap-1">
+                      <AlertTriangle className="w-2.5 h-2.5" />
+                      Periksa Gambar
+                    </span>
+                  )}
+                </div>
 
-            <div className="flex items-center justify-between pt-2.5 border-t border-[#171717]/15 mt-auto">
-              <span
-                className={`px-2 py-0.5 text-[11px] font-bold border-2 border-[#171717] rounded-[2px] ${
-                  item.isPublished ? 'bg-[#8ACCD5]' : 'bg-[#E5E5C7]'
-                }`}
-              >
-                {item.isPublished ? 'Publik' : 'Draf'}
-              </span>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => openEdit(item)}
-                  className="nb-btn nb-btn-mustard px-2.5 py-1 text-xs"
+                <div className="p-4 space-y-1.5">
+                  <p className="text-[11px] text-[#525252] truncate">
+                    {SERVICE_CATEGORY_LABELS[item.category]} · {item.clientName} · {item.year}
+                  </p>
+                  <h3 className="font-display font-bold text-sm sm:text-base text-[#171717] line-clamp-2 min-h-[2.4rem]">
+                    {item.title}
+                  </h3>
+                  <p className="text-xs text-[#404040] line-clamp-2">{item.summary}</p>
+                  <p className="text-xs font-semibold text-[#0F3D3A] pt-0.5 line-clamp-1">
+                    {item.metrics}
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-4 py-2.5 flex items-center justify-between border-t border-[#171717]/15 bg-[#F8F8E1]/40 mt-auto">
+                <span
+                  className={`px-2 py-0.5 text-[11px] font-bold border-2 border-[#171717] rounded-[2px] ${
+                    item.isPublished ? 'bg-[#8ACCD5]' : 'bg-[#E5E5C7]'
+                  }`}
                 >
-                  <Pencil className="w-3.5 h-3.5" />
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(item)}
-                  aria-label={`Hapus portofolio ${item.title}`}
-                  className="nb-btn nb-btn-surface p-1.5 text-[#6C151E]"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                  {item.isPublished ? 'Publik' : 'Draf'}
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(item)}
+                    className="nb-btn nb-btn-mustard px-2.5 py-1 text-xs"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit / Foto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(item)}
+                    aria-label={`Hapus portofolio ${item.title}`}
+                    className="nb-btn nb-btn-surface p-1.5 text-[#6C151E]"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <ConfirmDialog

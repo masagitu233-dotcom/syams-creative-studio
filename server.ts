@@ -137,6 +137,7 @@ async function startServer() {
       const meta = await drive.files.get({
         fileId,
         fields: 'id,name,mimeType,size',
+        supportsAllDrives: true,
       });
       const mimeType = meta.data.mimeType || 'application/octet-stream';
       const safeName = (meta.data.name || fileId).replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -146,7 +147,10 @@ async function startServer() {
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
       res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
       if (visibility === 'public') {
+        res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
       } else {
         res.setHeader('Cache-Control', 'private, no-store');
@@ -159,7 +163,7 @@ async function startServer() {
           const end = match[2] ? Math.min(Number(match[2]), totalSize - 1) : totalSize - 1;
           if (start <= end && start < totalSize) {
             const rangeRes = await drive.files.get(
-              { fileId, alt: 'media' },
+              { fileId, alt: 'media', supportsAllDrives: true },
               {
                 responseType: 'stream',
                 headers: { Range: `bytes=${start}-${end}` },
@@ -175,7 +179,7 @@ async function startServer() {
       }
 
       const streamRes = await drive.files.get(
-        { fileId, alt: 'media' },
+        { fileId, alt: 'media', supportsAllDrives: true },
         { responseType: 'stream' }
       );
       if (totalSize > 0) {
@@ -184,6 +188,12 @@ async function startServer() {
       (streamRes.data as NodeJS.ReadableStream).pipe(res);
     } catch (err) {
       const info = classifyDriveError(err);
+      console.error('[SYAMS EXPRESS MEDIA] serve_failed', {
+        fileId,
+        visibility,
+        status: info.status,
+        code: info.code,
+      });
       res.status(info.status).json({ error: info.error, code: info.code });
     }
   });
@@ -495,6 +505,7 @@ async function startServer() {
       if (newName) {
         await drive.files.update({
           fileId,
+          supportsAllDrives: true,
           requestBody: { name: newName },
           fields: 'id,name',
         });

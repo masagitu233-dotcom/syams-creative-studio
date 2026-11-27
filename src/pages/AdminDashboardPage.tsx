@@ -12,11 +12,16 @@ import {
   Lock,
   LogIn,
   LogOut,
+  Menu,
   Package,
+  Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   RefreshCw,
   Settings,
   ShoppingBag,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useStudioData } from '../contexts/StudioDataContext';
@@ -26,12 +31,14 @@ import {
 } from '../services/firestoreService';
 import { formatUserFriendlyError } from '../lib/firestoreErrors';
 import {
+  buildMediaProxyUrl,
   computeCatalogStats,
   computeOrderStats,
   formatDateTimeId,
   formatRupiah,
   ORDER_STATUS_META,
 } from '../utils/studioLogic';
+import { logMediaDiagnostic } from '../utils/mediaDiagnostics';
 import { INITIAL_SITE_SETTINGS } from '../data/initialCatalog';
 import { AdminOrdersPanel } from '../components/admin/AdminOrdersPanel';
 import { AdminProductsPanel } from '../components/admin/AdminProductsPanel';
@@ -40,6 +47,7 @@ import { AdminPortfolioPanel } from '../components/admin/AdminPortfolioPanel';
 import { AdminMediaPanel } from '../components/admin/AdminMediaPanel';
 import { AdminFaqPanel } from '../components/admin/AdminFaqPanel';
 import { AdminSettingsPanel } from '../components/admin/AdminSettingsPanel';
+import { AdminDesignStudioPanel } from '../components/admin/design/AdminDesignStudioPanel';
 import { AdminLogsPanel } from '../components/admin/AdminLogsPanel';
 import { ToastStack } from '../components/ToastStack';
 import type {
@@ -57,6 +65,7 @@ import type {
 
 type AdminTab =
   | 'overview'
+  | 'design'
   | 'products'
   | 'services'
   | 'orders'
@@ -76,6 +85,7 @@ interface AdminNavItem {
 
 const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { id: 'overview', path: '/admin', label: 'Ringkasan Dashboard', icon: LayoutDashboard, group: 'primary' },
+  { id: 'design', path: '/admin/desain', label: 'Website Design Studio', icon: Palette, group: 'primary' },
   { id: 'products', path: '/admin/produk', label: 'Kelola Produk Digital', icon: Package, group: 'primary' },
   { id: 'services', path: '/admin/layanan', label: 'Kelola Layanan', icon: Briefcase, group: 'primary' },
   { id: 'orders', path: '/admin/pesanan', label: 'Kelola Pesanan', icon: ShoppingBag, group: 'primary' },
@@ -117,6 +127,33 @@ export function AdminDashboardPage() {
   const [settings, setSettings] = useState<SiteSettings>(INITIAL_SITE_SETTINGS);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState<boolean>(() => {
+    try {
+      const saved = window.localStorage.getItem('syams_admin_sidebar_open');
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('syams_admin_sidebar_open', String(desktopSidebarOpen));
+    } catch {
+      // Ignore storage restrictions
+    }
+  }, [desktopSidebarOpen]);
+
+  useEffect(() => {
+    if (!mobileDrawerOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileDrawerOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileDrawerOpen]);
+
   const autoMigratedRef = useRef(false);
 
   const goToTab = useCallback(
@@ -125,6 +162,7 @@ export function AdminDashboardPage() {
       if (options?.openCreate && (tabId === 'products' || tabId === 'services')) {
         setAutoOpenTarget(tabId);
       }
+      setMobileDrawerOpen(false);
       navigate(target ? target.path : '/admin');
     },
     [navigate]
@@ -141,6 +179,17 @@ export function AdminDashboardPage() {
       setPortfolio(data.portfolio);
       setMedia(data.media);
       setDriveFolders(data.driveFolders || []);
+      logMediaDiagnostic('frontend_media_received', {
+        mediaCount: data.media.length,
+        latestMedia: data.media.slice(0, 5).map((m) => ({
+          id: m.id,
+          fileId: m.fileId,
+          fileName: m.fileName,
+          mimeType: m.mimeType,
+          visibility: m.visibility,
+          resolvedProxyUrl: buildMediaProxyUrl(m.fileId, m.visibility),
+        })),
+      });
       setFaqs(data.faqs);
       setLogs(data.logs);
       setMessages(data.messages);
@@ -377,124 +426,211 @@ export function AdminDashboardPage() {
 
   const activeNavMeta = ADMIN_NAV_ITEMS.find((t) => t.id === activeTab);
 
-  return (
-    <div className="min-h-screen bg-[#F8F8E1] flex flex-col lg:flex-row">
-      {/* Sidebar */}
-      <aside className="lg:w-60 lg:sticky lg:top-0 lg:h-screen shrink-0 bg-[#0F3D3A] text-[#F8F8E1] border-b-2 lg:border-b-0 lg:border-r-2 border-[#171717] flex flex-col justify-between overflow-y-auto">
-        <div>
-          <div className="px-4 h-14 border-b-2 border-[#171717] flex flex-col justify-center">
-            <Link to="/" className="font-display font-bold text-sm text-[#F3C95B] leading-tight">
+  const sidebarNavContent = (
+    <div className="flex flex-col justify-between h-full">
+      <div>
+        <div className="px-4 h-14 border-b-2 border-[#171717] flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <Link to="/" className="font-display font-bold text-sm text-[#F3C95B] leading-tight block truncate">
               SYAMS CREATIVE STUDIO
             </Link>
-            <p className="text-[11px] text-[#F8F8E1]/75">Panel Admin Produksi</p>
+            <p className="text-[11px] text-[#F8F8E1]/75 truncate">Panel Admin Produksi</p>
           </div>
-
-          <nav aria-label="Menu utama dashboard admin" className="p-2.5 flex lg:flex-col gap-1 overflow-x-auto">
-            <p className="hidden lg:block px-2.5 pt-1 pb-1 text-[10px] font-mono uppercase tracking-wider text-[#8ACCD5]/80">
-              Manajemen Utama
-            </p>
-            {primaryNav.map((tab) => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.id;
-              const badge = getNavBadge(tab.id);
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => goToTab(tab.id)}
-                  className={`flex items-center justify-between gap-2 px-3 py-2 text-xs font-display font-semibold rounded-[4px] border-2 whitespace-nowrap transition-colors cursor-pointer ${
-                    active
-                      ? 'bg-[#F3C95B] text-[#171717] border-[#171717] nb-shadow-sm'
-                      : 'border-transparent text-[#F8F8E1]/90 hover:bg-[#16534F]'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2 min-w-0">
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{tab.label}</span>
-                  </span>
-                  {badge !== null && (
-                    <span
-                      className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-[2px] border ${
-                        active
-                          ? 'bg-[#0F3D3A] text-[#F3C95B] border-[#171717]'
-                          : 'bg-[#0A2B29] text-[#8ACCD5] border-[#8ACCD5]/30'
-                      }`}
-                    >
-                      {badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-
-            <div className="hidden lg:block my-2 border-t border-[#F8F8E1]/15" />
-            <p className="hidden lg:block px-2.5 pb-1 text-[10px] font-mono uppercase tracking-wider text-[#8ACCD5]/80">
-              Konten &amp; Sistem
-            </p>
-            {secondaryNav.map((tab) => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.id;
-              const badge = getNavBadge(tab.id);
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => goToTab(tab.id)}
-                  className={`flex items-center justify-between gap-2 px-3 py-2 text-xs font-display font-semibold rounded-[4px] border-2 whitespace-nowrap transition-colors cursor-pointer ${
-                    active
-                      ? 'bg-[#F3C95B] text-[#171717] border-[#171717] nb-shadow-sm'
-                      : 'border-transparent text-[#F8F8E1]/85 hover:bg-[#16534F]'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2 min-w-0">
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{tab.label}</span>
-                  </span>
-                  {badge !== null && (
-                    <span
-                      className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-[2px] border ${
-                        active
-                          ? 'bg-[#0F3D3A] text-[#F3C95B] border-[#171717]'
-                          : 'bg-[#0A2B29] text-[#8ACCD5] border-[#8ACCD5]/30'
-                      }`}
-                    >
-                      {badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+          <button
+            type="button"
+            onClick={() => setDesktopSidebarOpen(false)}
+            aria-label="Tutup sidebar admin"
+            title="Tutup sidebar admin"
+            className="hidden lg:inline-flex items-center justify-center w-7 h-7 rounded-[4px] border border-[#F8F8E1]/25 text-[#F8F8E1]/90 hover:bg-[#16534F] hover:text-[#F3C95B] transition-colors cursor-pointer shrink-0"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileDrawerOpen(false)}
+            aria-label="Tutup menu admin"
+            className="lg:hidden inline-flex items-center justify-center w-8 h-8 rounded-[4px] border border-[#F8F8E1]/25 text-[#F8F8E1] hover:bg-[#16534F] transition-colors cursor-pointer shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        <div className="p-3.5 border-t-2 border-[#171717] space-y-2.5 hidden lg:block">
-          <div className="text-xs">
-            <p className="font-semibold text-[#F8F8E1] truncate">{user.displayName || 'Admin Utama'}</p>
-            <p className="text-[11px] text-[#8ACCD5] truncate">{user.email}</p>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Link to="/" className="nb-btn nb-btn-surface px-2.5 py-1.5 text-xs w-full">
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Lihat Situs Publik
-            </Link>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className="nb-btn nb-btn-burgundy px-2.5 py-1.5 text-xs w-full"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Keluar
-            </button>
-          </div>
+        <nav aria-label="Menu utama dashboard admin" className="p-2.5 flex flex-col gap-1">
+          <p className="px-2.5 pt-1 pb-1 text-[10px] font-mono uppercase tracking-wider text-[#8ACCD5]/80">
+            Manajemen Utama
+          </p>
+          {primaryNav.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            const badge = getNavBadge(tab.id);
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => goToTab(tab.id)}
+                className={`flex items-center justify-between gap-2 px-3 py-2 text-xs font-display font-semibold rounded-[4px] border-2 whitespace-nowrap transition-colors cursor-pointer ${
+                  active
+                    ? 'bg-[#F3C95B] text-[#171717] border-[#171717] nb-shadow-sm'
+                    : 'border-transparent text-[#F8F8E1]/90 hover:bg-[#16534F]'
+                }`}
+              >
+                <span className="inline-flex items-center gap-2 min-w-0">
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{tab.label}</span>
+                </span>
+                {badge !== null && (
+                  <span
+                    className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-[2px] border ${
+                      active
+                        ? 'bg-[#0F3D3A] text-[#F3C95B] border-[#171717]'
+                        : 'bg-[#0A2B29] text-[#8ACCD5] border-[#8ACCD5]/30'
+                    }`}
+                  >
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          <div className="my-2 border-t border-[#F8F8E1]/15" />
+          <p className="px-2.5 pb-1 text-[10px] font-mono uppercase tracking-wider text-[#8ACCD5]/80">
+            Konten &amp; Sistem
+          </p>
+          {secondaryNav.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            const badge = getNavBadge(tab.id);
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => goToTab(tab.id)}
+                className={`flex items-center justify-between gap-2 px-3 py-2 text-xs font-display font-semibold rounded-[4px] border-2 whitespace-nowrap transition-colors cursor-pointer ${
+                  active
+                    ? 'bg-[#F3C95B] text-[#171717] border-[#171717] nb-shadow-sm'
+                    : 'border-transparent text-[#F8F8E1]/85 hover:bg-[#16534F]'
+                }`}
+              >
+                <span className="inline-flex items-center gap-2 min-w-0">
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{tab.label}</span>
+                </span>
+                {badge !== null && (
+                  <span
+                    className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-[2px] border ${
+                      active
+                        ? 'bg-[#0F3D3A] text-[#F3C95B] border-[#171717]'
+                        : 'bg-[#0A2B29] text-[#8ACCD5] border-[#8ACCD5]/30'
+                    }`}
+                  >
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="p-3.5 border-t-2 border-[#171717] space-y-2.5">
+        <div className="text-xs">
+          <p className="font-semibold text-[#F8F8E1] truncate">{user.displayName || 'Admin Utama'}</p>
+          <p className="text-[11px] text-[#8ACCD5] truncate">{user.email}</p>
         </div>
+        <div className="flex flex-col gap-1.5">
+          <Link to="/" className="nb-btn nb-btn-surface px-2.5 py-1.5 text-xs w-full">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Lihat Situs Publik
+          </Link>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="nb-btn nb-btn-burgundy px-2.5 py-1.5 text-xs w-full"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Keluar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#F8F8E1] flex flex-col lg:flex-row overflow-x-clip">
+      {/* Desktop Collapsible Sidebar */}
+      <aside
+        aria-label="Sidebar navigasi admin"
+        aria-hidden={!desktopSidebarOpen}
+        className={`hidden lg:block lg:sticky lg:top-0 lg:h-screen shrink-0 bg-[#0F3D3A] text-[#F8F8E1] overflow-y-auto transition-[width,opacity,border-width] duration-200 ease-out ${
+          desktopSidebarOpen
+            ? 'lg:w-60 opacity-100 border-r-2 border-[#171717]'
+            : 'lg:w-0 opacity-0 border-r-0 overflow-hidden pointer-events-none'
+        }`}
+      >
+        <div className="w-60 h-full">{sidebarNavContent}</div>
       </aside>
+
+      {/* Mobile & Tablet Slide-Over Drawer */}
+      {mobileDrawerOpen && (
+        <div
+          className="fixed inset-0 z-50 lg:hidden flex"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu navigasi admin"
+        >
+          <div
+            className="fixed inset-0 bg-[#171717]/60 backdrop-blur-[2px]"
+            onClick={() => setMobileDrawerOpen(false)}
+          />
+          <aside className="relative z-10 w-72 max-w-[85vw] h-full bg-[#0F3D3A] text-[#F8F8E1] border-r-2 border-[#171717] overflow-y-auto shadow-2xl">
+            {sidebarNavContent}
+          </aside>
+        </div>
+      )}
 
       {/* Workspace Viewport */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-30 bg-white border-b-2 border-[#171717] px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-          <p className="text-xs sm:text-sm font-display font-bold text-[#171717] truncate">
-            Admin / {activeNavMeta?.label || 'Ringkasan Dashboard'}
-          </p>
+        <header className="sticky top-0 z-30 bg-white border-b-2 border-[#171717] px-3 sm:px-6 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Desktop Sidebar Toggle */}
+            <button
+              type="button"
+              onClick={() => setDesktopSidebarOpen((prev) => !prev)}
+              aria-expanded={desktopSidebarOpen}
+              aria-label={desktopSidebarOpen ? 'Tutup sidebar admin' : 'Buka sidebar admin'}
+              title={desktopSidebarOpen ? 'Tutup sidebar admin' : 'Buka sidebar admin'}
+              className="hidden lg:inline-flex nb-btn nb-btn-surface px-2.5 py-1.5 text-xs shrink-0"
+            >
+              {desktopSidebarOpen ? (
+                <>
+                  <PanelLeftClose className="w-3.5 h-3.5" />
+                  <span>Tutup Menu</span>
+                </>
+              ) : (
+                <>
+                  <PanelLeftOpen className="w-3.5 h-3.5" />
+                  <span>Buka Menu</span>
+                </>
+              )}
+            </button>
+
+            {/* Mobile/Tablet Drawer Toggle */}
+            <button
+              type="button"
+              onClick={() => setMobileDrawerOpen(true)}
+              aria-expanded={mobileDrawerOpen}
+              aria-label="Buka menu navigasi admin"
+              className="lg:hidden inline-flex nb-btn nb-btn-surface px-2.5 py-1.5 text-xs shrink-0"
+            >
+              <Menu className="w-4 h-4" />
+              <span>Menu</span>
+            </button>
+
+            <p className="text-xs sm:text-sm font-display font-bold text-[#171717] truncate">
+              Admin / {activeNavMeta?.label || 'Ringkasan Dashboard'}
+            </p>
+          </div>
 
           <div className="flex items-center gap-2 shrink-0">
             <button
@@ -504,7 +640,7 @@ export function AdminDashboardPage() {
               className="nb-btn nb-btn-surface px-3 py-1.5 text-xs"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? 'animate-spin' : ''}`} />
-              Segarkan
+              <span className="hidden sm:inline">Segarkan</span>
             </button>
             <button
               type="button"
@@ -516,7 +652,11 @@ export function AdminDashboardPage() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 max-w-6xl w-full mx-auto space-y-5">
+        <main
+          className={`flex-1 p-3 sm:p-5 lg:p-6 w-full mx-auto space-y-5 min-w-0 ${
+            activeTab === 'design' ? 'max-w-[1840px]' : 'max-w-7xl'
+          }`}
+        >
           {dataError && (
             <div className="p-3.5 bg-[#6C151E] text-[#F8F8E1] border-2 border-[#171717] rounded-[4px] text-xs sm:text-sm">
               {dataError}
@@ -658,6 +798,14 @@ export function AdminDashboardPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => goToTab('design')}
+                    className="nb-btn nb-btn-primary px-3.5 py-2 text-xs"
+                  >
+                    <Palette className="w-3.5 h-3.5" />
+                    Website Design Studio
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => goToTab('settings')}
                     className="nb-btn nb-btn-surface px-3.5 py-2 text-xs"
                   >
@@ -761,6 +909,21 @@ export function AdminDashboardPage() {
                 )}
               </div>
             </div>
+          )}
+
+          {activeTab === 'design' && (
+            <AdminDesignStudioPanel
+              products={products}
+              services={services}
+              portfolio={portfolio}
+              media={media}
+              driveFolders={driveFolders}
+              actor={actor}
+              onRefresh={async () => {
+                await loadDashboardData();
+              }}
+              onToast={pushToast}
+            />
           )}
 
           {activeTab === 'products' && (

@@ -110,5 +110,20 @@ test('Orders rule allows optional empty customerWhatsapp while keeping length bo
   assert.equal(blueprint.entities.Order.properties.customerWhatsapp.maxLength, 25);
 });
 
+test('Site design collection isolates draft/previous to admins and restricts mutations to verified admins', () => {
+  assert.match(rulesSource, /function isValidSiteDesign\(data, designId\)/);
+  assert.match(
+    rulesSource,
+    /match \/site_design\/\{designId\}[\s\S]*?allow get: if isValidId\(designId\) && \(designId == 'published' \|\| isAdmin\(\)\);[\s\S]*?allow list: if false;/
+  );
+  assert.match(
+    rulesSource,
+    /match \/site_design\/\{designId\}[\s\S]*?designId in \['published', 'draft', 'previous'\] &&[\s\S]*?isValidSiteDesign\(incoming\(\), designId\) &&[\s\S]*?incoming\(\)\.updatedAt == request\.time &&[\s\S]*?isAdmin\(\)/
+  );
+  assert.match(rulesSource, /match \/site_design\/\{designId\}[\s\S]*?allow delete: if false;/);
+  assert.ok(blueprint.entities.ActivityLog.properties.entityType.enum.includes('site_design'));
+});
+
+
 
 

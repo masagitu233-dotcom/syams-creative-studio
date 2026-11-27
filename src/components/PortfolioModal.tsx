@@ -66,6 +66,7 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
               <StudioImage
                 src={item.imageUrl}
                 driveFileId={item.driveFileId}
+                cacheVersion={item.updatedAt}
                 alt={item.title}
                 aspectClass="aspect-[16/9] max-h-[240px]"
               />
@@ -115,6 +116,7 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
                   <MediaGallerySection
                     items={item.gallery}
                     title="Dokumentasi Proyek"
+                    cacheVersion={item.updatedAt}
                     compact
                   />
                 </div>

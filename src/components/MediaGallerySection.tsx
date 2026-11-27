@@ -8,12 +8,14 @@ interface MediaGallerySectionProps {
   items?: MediaGalleryItem[];
   title?: string;
   compact?: boolean;
+  cacheVersion?: unknown;
 }
 
 export function MediaGallerySection({
   items,
   title = 'Dokumentasi & Galeri Media',
   compact = false,
+  cacheVersion,
 }: MediaGallerySectionProps) {
   const [activeItem, setActiveItem] = useState<MediaGalleryItem | null>(null);
 
@@ -46,7 +48,7 @@ export function MediaGallerySection({
       >
         {items.map((item) => {
           const isVideo = isVideoMimeType(item.mimeType);
-          const proxyUrl = buildMediaProxyUrl(item.fileId, 'public');
+          const proxyUrl = buildMediaProxyUrl(item.fileId, 'public', cacheVersion);
           return (
             <button
               key={item.fileId}
@@ -77,6 +79,7 @@ export function MediaGallerySection({
                   <StudioImage
                     src={item.imageUrl}
                     driveFileId={item.fileId}
+                    cacheVersion={cacheVersion}
                     alt={item.caption || item.fileName}
                     aspectClass="aspect-[16/10]"
                     className="group-hover:scale-[1.03]"
@@ -132,19 +135,24 @@ export function MediaGallerySection({
             <div className="bg-[#171717] flex items-center justify-center max-h-[75vh] overflow-hidden">
               {isVideoMimeType(activeItem.mimeType) ? (
                 <video
-                  src={buildMediaProxyUrl(activeItem.fileId, 'public')}
+                  src={buildMediaProxyUrl(activeItem.fileId, 'public', cacheVersion)}
                   controls
                   autoPlay
                   playsInline
                   className="max-h-[75vh] w-full object-contain"
                 />
               ) : (
-                <img
-                  src={
-                    buildMediaProxyUrl(activeItem.fileId, 'public') || activeItem.imageUrl || ''
-                  }
+                <StudioImage
+                  src={activeItem.imageUrl}
+                  driveFileId={activeItem.fileId}
+                  cacheVersion={cacheVersion}
                   alt={activeItem.caption || activeItem.fileName}
-                  className="max-h-[75vh] w-auto object-contain"
+                  aspectClass="w-full h-[65vh] max-h-[75vh]"
+                  fit="contain"
+                  loading="eager"
+                  allowSrcFallback={Boolean(activeItem.imageUrl)}
+                  showErrorDetails
+                  className="max-h-[75vh]"
                 />
               )}
             </div>

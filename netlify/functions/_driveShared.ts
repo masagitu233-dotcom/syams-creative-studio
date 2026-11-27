@@ -7,6 +7,9 @@ export interface NetlifyEvent {
   httpMethod: string;
   headers: Record<string, string | undefined>;
   queryStringParameters?: Record<string, string | undefined> | null;
+  rawQuery?: string;
+  path?: string;
+  rawUrl?: string;
   body: string | null;
 }
 
@@ -165,6 +168,65 @@ export function createDriveClient(): drive_v3.Drive | null {
 
 export function isValidDriveId(id: string): boolean {
   return typeof id === 'string' && /^[a-zA-Z0-9_\-]{3,200}$/.test(id.trim());
+}
+
+export function extractMediaParamsFromEvent(event: NetlifyEvent): {
+  fileId: string;
+  visibility: MediaVisibilityKey;
+} {
+  let fileId = (event.queryStringParameters?.fileId || '').trim();
+  let visibilityRaw = (event.queryStringParameters?.visibility || '').trim();
+
+  if ((!fileId || !visibilityRaw) && typeof event.rawQuery === 'string' && event.rawQuery) {
+    const sp = new URLSearchParams(event.rawQuery);
+    if (!fileId) fileId = (sp.get('fileId') || '').trim();
+    if (!visibilityRaw) visibilityRaw = (sp.get('visibility') || '').trim();
+  }
+
+  if ((!fileId || !visibilityRaw) && typeof event.rawUrl === 'string' && event.rawUrl) {
+    try {
+      const parsed = new URL(event.rawUrl);
+      if (!fileId) fileId = (parsed.searchParams.get('fileId') || '').trim();
+      if (!visibilityRaw) visibilityRaw = (parsed.searchParams.get('visibility') || '').trim();
+      if (!fileId) {
+        const m = parsed.pathname.match(/\/(?:api\/media|\.netlify\/functions\/media)\/([a-zA-Z0-9_\-]{3,200})/);
+        if (m?.[1]) fileId = decodeURIComponent(m[1]).trim();
+      }
+    } catch {
+      // Ignore malformed rawUrl
+    }
+  }
+
+  if (!fileId && typeof event.path === 'string' && event.path) {
+    const m = event.path.match(/\/(?:api\/media|\.netlify\/functions\/media)\/([a-zA-Z0-9_\-]{3,200})/);
+    if (m?.[1]) fileId = decodeURIComponent(m[1]).trim();
+  }
+
+  const visibility: MediaVisibilityKey = visibilityRaw === 'private' ? 'private' : 'public';
+  return { fileId, visibility };
+}
+
+export async function coerceDriveBinaryToBuffer(data: unknown): Promise<Buffer> {
+  if (!data) return Buffer.alloc(0);
+  if (Buffer.isBuffer(data)) return data;
+  if (data instanceof ArrayBuffer) return Buffer.from(data);
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+  if (typeof (data as { arrayBuffer?: () => Promise<ArrayBuffer> }).arrayBuffer === 'function') {
+    const ab = await (data as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer();
+    return Buffer.from(ab);
+  }
+  if (typeof (data as AsyncIterable<unknown>)[Symbol.asyncIterator] === 'function') {
+    const chunks: Buffer[] = [];
+    for await (const chunk of data as AsyncIterable<Uint8Array | Buffer | string>) {
+      if (Buffer.isBuffer(chunk)) chunks.push(chunk);
+      else if (typeof chunk === 'string') chunks.push(Buffer.from(chunk));
+      else chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+  return Buffer.alloc(0);
 }
 
 export function isValidEntityId(id: string): boolean {
@@ -539,6 +601,7 @@ async function verifyFolderExists(
     const res = await drive.files.get({
       fileId: folderId,
       fields: 'id,name,mimeType,trashed,parents',
+      supportsAllDrives: true,
     });
     if (
       res.data.id &&
@@ -589,6 +652,8 @@ async function findOrCreateFolder(
       fields: 'files(id,name)',
       pageSize: 1,
       spaces: 'drive',
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
     });
     const foundByProp = propSearch.data.files?.[0];
     if (foundByProp?.id) {
@@ -605,6 +670,8 @@ async function findOrCreateFolder(
     fields: 'files(id,name)',
     pageSize: 1,
     spaces: 'drive',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
   const foundByName = nameSearch.data.files?.[0];
   if (foundByName?.id) {
@@ -613,6 +680,7 @@ async function findOrCreateFolder(
       await drive.files
         .update({
           fileId: foundByName.id,
+          supportsAllDrives: true,
           requestBody: {
             appProperties: {
               [options.appPropertyKey]: options.appPropertyValue,
@@ -627,6 +695,7 @@ async function findOrCreateFolder(
 
   // 4. Create folder once
   const created = await drive.files.create({
+    supportsAllDrives: true,
     requestBody: {
       name: options.name,
       mimeType: 'application/vnd.google-apps.folder',
@@ -769,28 +838,36 @@ export async function setDriveFilePublicAccess(
   drive: drive_v3.Drive,
   fileId: string,
   isPublic: boolean
-): Promise<void> {
-  if (!isValidDriveId(fileId)) return;
+): Promise<boolean> {
+  if (!isValidDriveId(fileId)) return false;
 
   if (isPublic) {
-    await drive.permissions
-      .create({
+    try {
+      await drive.permissions.create({
         fileId,
+        supportsAllDrives: true,
         requestBody: {
           role: 'reader',
           type: 'anyone',
         },
-      })
-      .catch(() => {
-        // Permission may already exist; ignore duplicate creation error
       });
-    return;
+      return true;
+    } catch (err) {
+      const info = classifyDriveError(err);
+      console.warn('[SYAMS DRIVE] permissions.create notice', {
+        fileId,
+        code: info.code,
+        status: info.status,
+      });
+      return false;
+    }
   }
 
   // Private: revoke only 'anyone' public permissions on this individual file
   const perms = await drive.permissions
     .list({
       fileId,
+      supportsAllDrives: true,
       fields: 'permissions(id,type)',
     })
     .catch(() => null);
@@ -798,9 +875,12 @@ export async function setDriveFilePublicAccess(
   const anyonePerms = (perms?.data.permissions || []).filter((p) => p.type === 'anyone' && p.id);
   for (const perm of anyonePerms) {
     if (perm.id) {
-      await drive.permissions.delete({ fileId, permissionId: perm.id }).catch(() => {});
+      await drive.permissions
+        .delete({ fileId, permissionId: perm.id, supportsAllDrives: true })
+        .catch(() => {});
     }
   }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -905,7 +985,7 @@ export async function initResumableDriveUpload(params: {
   }
 
   const initRes = await fetch(
-    `${GOOGLE_RESUMABLE_UPLOAD_PREFIX}?uploadType=resumable&fields=id,name,mimeType,size,parents`,
+    `${GOOGLE_RESUMABLE_UPLOAD_PREFIX}?uploadType=resumable&supportsAllDrives=true&fields=id,name,mimeType,size,parents`,
     {
       method: 'POST',
       headers: {
@@ -1027,9 +1107,31 @@ export async function uploadResumableDriveChunk(params: {
     }
 
     const drive = createDriveClient();
+    let publicPermissionApplied = false;
     if (drive) {
-      await setDriveFilePublicAccess(drive, fileId, session.visibility === 'public');
+      publicPermissionApplied = await setDriveFilePublicAccess(
+        drive,
+        fileId,
+        session.visibility === 'public'
+      );
     }
+
+    const proxyUrl =
+      session.visibility === 'private'
+        ? `/api/media/${encodeURIComponent(fileId)}?visibility=private`
+        : `/api/media/${encodeURIComponent(fileId)}`;
+
+    console.info('[SYAMS DRIVE] resumable_upload_completed', {
+      fileId,
+      fileName: data.name || session.fileName,
+      mimeType: data.mimeType || session.mimeType,
+      sizeBytes: Number(data.size || session.totalSize),
+      visibility: session.visibility,
+      usage: session.usage,
+      folderId: session.folderId,
+      publicPermissionApplied,
+      proxyUrl,
+    });
 
     return {
       ok: true as const,
@@ -1042,10 +1144,8 @@ export async function uploadResumableDriveChunk(params: {
       usage: session.usage,
       folderId: session.folderId,
       folderPath: session.folderPath,
-      proxyUrl:
-        session.visibility === 'private'
-          ? `/api/media/${encodeURIComponent(fileId)}?visibility=private`
-          : `/api/media/${encodeURIComponent(fileId)}`,
+      publicPermissionApplied,
+      proxyUrl,
     };
   }
 
@@ -1084,6 +1184,7 @@ export async function uploadDirectToDrive(params: {
   });
 
   const created = await drive.files.create({
+    supportsAllDrives: true,
     requestBody: {
       name: params.fileName,
       parents: [target.folderId],
@@ -1100,7 +1201,28 @@ export async function uploadDirectToDrive(params: {
     throw new Error('Google Drive tidak mengembalikan fileId.');
   }
 
-  await setDriveFilePublicAccess(drive, fileId, params.visibility === 'public');
+  const publicPermissionApplied = await setDriveFilePublicAccess(
+    drive,
+    fileId,
+    params.visibility === 'public'
+  );
+
+  const proxyUrl =
+    params.visibility === 'private'
+      ? `/api/media/${encodeURIComponent(fileId)}?visibility=private`
+      : `/api/media/${encodeURIComponent(fileId)}`;
+
+  console.info('[SYAMS DRIVE] direct_upload_completed', {
+    fileId,
+    fileName: created.data.name || params.fileName,
+    mimeType: created.data.mimeType || params.mimeType,
+    sizeBytes: Number(created.data.size || params.buffer.byteLength),
+    visibility: params.visibility,
+    usage: params.usage,
+    folderId: target.folderId,
+    publicPermissionApplied,
+    proxyUrl,
+  });
 
   return {
     fileId,
@@ -1112,10 +1234,8 @@ export async function uploadDirectToDrive(params: {
     folderId: target.folderId,
     folderPath: target.folderPath,
     syncedFolders,
-    proxyUrl:
-      params.visibility === 'private'
-        ? `/api/media/${encodeURIComponent(fileId)}?visibility=private`
-        : `/api/media/${encodeURIComponent(fileId)}`,
+    publicPermissionApplied,
+    proxyUrl,
   };
 }
 
@@ -1133,6 +1253,7 @@ export async function replaceDriveFileContent(params: {
 
   const updated = await drive.files.update({
     fileId: params.fileId,
+    supportsAllDrives: true,
     requestBody: {
       name: params.fileName,
     },
@@ -1143,7 +1264,11 @@ export async function replaceDriveFileContent(params: {
     fields: 'id,name,mimeType,size',
   });
 
-  await setDriveFilePublicAccess(drive, params.fileId, params.visibility === 'public');
+  const publicPermissionApplied = await setDriveFilePublicAccess(
+    drive,
+    params.fileId,
+    params.visibility === 'public'
+  );
 
   return {
     fileId: updated.data.id || params.fileId,
@@ -1151,6 +1276,7 @@ export async function replaceDriveFileContent(params: {
     mimeType: updated.data.mimeType || params.mimeType,
     sizeBytes: Number(updated.data.size || params.buffer.byteLength),
     visibility: params.visibility,
+    publicPermissionApplied,
     proxyUrl:
       params.visibility === 'private'
         ? `/api/media/${encodeURIComponent(params.fileId)}?visibility=private`
@@ -1165,7 +1291,7 @@ export async function deleteDriveFile(fileId: string): Promise<{ deleted: true; 
   }
 
   try {
-    await drive.files.delete({ fileId });
+    await drive.files.delete({ fileId, supportsAllDrives: true });
     return { deleted: true, alreadyMissing: false };
   } catch (err) {
     const info = classifyDriveError(err);

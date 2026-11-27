@@ -19,6 +19,7 @@ import {
   saveMediaMetadata,
 } from '../../services/firestoreService';
 import { formatUserFriendlyError } from '../../lib/firestoreErrors';
+import { logMediaDiagnostic } from '../../utils/mediaDiagnostics';
 import {
   DRIVE_CATEGORY_FOLDER_NAMES,
   formatFileSize,
@@ -60,6 +61,7 @@ interface QueueItem {
 interface AdminMediaUploaderProps {
   usage: MediaUsage;
   visibility?: MediaVisibility;
+  isPublished?: boolean;
   entityType?: MediaEntityType;
   entityId?: string;
   entityName?: string;
@@ -77,6 +79,7 @@ interface AdminMediaUploaderProps {
 export function AdminMediaUploader({
   usage,
   visibility = 'public',
+  isPublished,
   entityType,
   entityId,
   entityName,
@@ -227,6 +230,18 @@ export function AdminMediaUploader({
         },
       });
 
+      logMediaDiagnostic('drive_upload_response', {
+        fileId: uploaded.fileId,
+        fileName: uploaded.fileName,
+        mimeType: uploaded.mimeType,
+        sizeBytes: uploaded.sizeBytes,
+        visibility,
+        usage,
+        folderId: uploaded.folderId || null,
+        folderPath: uploaded.folderPath || null,
+        proxyUrl: uploaded.proxyUrl,
+      });
+
       if (uploaded.syncedFolders && uploaded.syncedFolders.length > 0) {
         await saveCachedDriveFolders(uploaded.syncedFolders).catch(() => {});
       }
@@ -251,11 +266,21 @@ export function AdminMediaUploader({
           entityType: resolvedEntityType,
           entityId,
           entityName,
-          isPublished: visibility === 'public',
+          isPublished: isPublished ?? visibility === 'public',
           ownerUid: actor.uid,
         },
         { ...actor, isAdmin: true }
       );
+
+      logMediaDiagnostic('firestore_metadata_saved', {
+        collection: 'media',
+        mediaDocId,
+        fileId: uploaded.fileId,
+        fileName: uploaded.fileName,
+        mimeType: uploaded.mimeType,
+        visibility,
+        usage,
+      });
 
       const summary: UploadedMediaSummary = {
         mediaDocId,
@@ -408,6 +433,11 @@ export function AdminMediaUploader({
               <p className="text-[10px] font-mono text-[#0F3D3A] truncate">
                 Tujuan Drive: {folderTargetLabel}
               </p>
+              {isPublished === false && (
+                <p className="text-[10px] font-semibold text-[#6C151E]">
+                  Status Draf: Berkas baru ditandai sebagai draf dan tidak otomatis muncul di daftar pilihan media publik.
+                </p>
+              )}
             </div>
           </div>
 

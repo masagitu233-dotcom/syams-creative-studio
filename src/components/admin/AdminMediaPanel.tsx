@@ -26,6 +26,7 @@ import {
   deleteMediaAndCleanupReferences,
   saveCachedDriveFolders,
   saveMediaMetadata,
+  syncReplacedMediaVersionAcrossReferences,
   updateMediaMetadataByAdmin,
 } from '../../services/firestoreService';
 import {
@@ -38,8 +39,10 @@ import {
   type DriveStatusResponse,
 } from '../../services/apiService';
 import { formatUserFriendlyError } from '../../lib/firestoreErrors';
+import { clearMediaProbeCache, logMediaDiagnostic } from '../../utils/mediaDiagnostics';
 import {
   buildMediaProxyUrl,
+  canDeleteMediaAsset,
   DRIVE_CATEGORY_FOLDER_NAMES,
   findMediaUsages,
   formatDateTimeId,
@@ -49,7 +52,6 @@ import {
   MEDIA_USAGE_LABELS,
   type MediaUsageReference,
 } from '../../utils/studioLogic';
-import { STUDIO_IMAGES } from '../../data/initialCatalog';
 import { StudioImage } from '../StudioImage';
 import { AdminMediaUploader } from './AdminMediaUploader';
 import type {
@@ -126,7 +128,12 @@ export function AdminMediaPanel({
   // Preview modal & private blob loading
   const [previewItem, setPreviewItem] = useState<MediaAsset | null>(null);
   const [privatePreviewUrl, setPrivatePreviewUrl] = useState<string | null>(null);
+  const [privatePreviewError, setPrivatePreviewError] = useState<string | null>(null);
   const [loadingPrivatePreview, setLoadingPrivatePreview] = useState(false);
+
+  // Per-item thumbnail retry & error tracking (no silent masking)
+  const [retryCounts, setRetryCounts] = useState<Record<string, number>>({});
+  const [failedThumbnails, setFailedThumbnails] = useState<Record<string, string>>({});
 
   // Row busy states
   const [togglingVisibilityId, setTogglingVisibilityId] = useState<string | null>(null);
@@ -142,6 +149,13 @@ export function AdminMediaPanel({
     void fetchDriveIntegrationStatus().then(setDriveStatus);
   }, []);
 
+  useEffect(() => {
+    logMediaDiagnostic('frontend_media_received', {
+      panel: 'AdminMediaPanel',
+      mediaCount: media.length,
+    });
+  }, [media.length]);
+
   // Load authenticated blob URL when previewing a private media item
   useEffect(() => {
     let revoked = false;
@@ -149,12 +163,14 @@ export function AdminMediaPanel({
 
     if (!previewItem || previewItem.visibility !== 'private') {
       setPrivatePreviewUrl(null);
+      setPrivatePreviewError(null);
       setLoadingPrivatePreview(false);
       return;
     }
 
     setLoadingPrivatePreview(true);
     setPrivatePreviewUrl(null);
+    setPrivatePreviewError(null);
 
     void fetchPrivateMediaBlobUrl(previewItem.fileId)
       .then((url) => {
@@ -165,9 +181,14 @@ export function AdminMediaPanel({
         createdUrl = url;
         setPrivatePreviewUrl(url);
       })
-      .catch(() => {
+      .catch((err) => {
         if (!revoked) {
           setPrivatePreviewUrl(null);
+          setPrivatePreviewError(
+            err instanceof Error
+              ? err.message
+              : 'Gagal memuat berkas privat dari Google Drive proxy.'
+          );
         }
       })
       .finally(() => {
@@ -180,7 +201,7 @@ export function AdminMediaPanel({
         URL.revokeObjectURL(createdUrl);
       }
     };
-  }, [previewItem]);
+  }, [previewItem, retryCounts]);
 
   const cachedFolderMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -419,11 +440,30 @@ export function AdminMediaPanel({
         },
         actor
       );
+      const versionTs = Date.now();
+      const targetUsages = usageMap.get(target.fileId) || [];
+      const syncedCount = await syncReplacedMediaVersionAcrossReferences({
+        fileId: target.fileId,
+        versionTs,
+        usages: targetUsages,
+        products,
+        services,
+        portfolio,
+        siteSettings,
+      });
+      clearMediaProbeCache(buildMediaProxyUrl(target.fileId, target.visibility));
+      setRetryCounts((prev) => ({
+        ...prev,
+        [target.id]: (prev[target.id] || 0) + 1,
+      }));
       await onRefresh();
       onToast({
         type: 'success',
         title: 'Berkas Media Berhasil Diganti',
-        description: `"${replaced.fileName}" menggantikan isi fileId ${target.fileId}. Seluruh referensi tetap terhubung.`,
+        description:
+          syncedCount > 0
+            ? `"${replaced.fileName}" menggantikan isi fileId ${target.fileId} dan cache pada ${syncedCount} konten aktif langsung diperbarui.`
+            : `"${replaced.fileName}" menggantikan isi fileId ${target.fileId}.`,
       });
     } catch (err) {
       onToast({
@@ -441,17 +481,27 @@ export function AdminMediaPanel({
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
     const targetUsages = usageMap.get(deleteTarget.fileId) || [];
+    const deleteGuard = canDeleteMediaAsset(targetUsages);
+    if (!deleteGuard.allowed) {
+      onToast({
+        type: 'error',
+        title: 'Penghapusan Media Diblokir',
+        description: deleteGuard.reason,
+      });
+      return;
+    }
+
     setDeleting(true);
     try {
       // Step 1: Delete from Google Drive FIRST for strict Drive <-> Firestore consistency
       const driveResult = await deleteDriveMediaBackend(deleteTarget.fileId);
 
-      // Step 2: Clean up Firestore active references & delete media metadata atomically
+      // Step 2: Delete media metadata atomically
       await deleteMediaAndCleanupReferences({
         mediaId: deleteTarget.id,
         fileId: deleteTarget.fileId,
         fileName: deleteTarget.fileName,
-        usages: targetUsages,
+        usages: [],
         products,
         services,
         portfolio,
@@ -468,8 +518,8 @@ export function AdminMediaPanel({
         type: 'info',
         title: 'Media Dihapus dari Google Drive & Firestore',
         description: driveResult.alreadyMissing
-          ? `Berkas sudah tidak ada di Drive; metadata "${deleteTarget.fileName}" dan ${targetUsages.length} referensi dibersihkan.`
-          : `"${deleteTarget.fileName}" berhasil dihapus beserta ${targetUsages.length} referensi aktif.`,
+          ? `Berkas sudah tidak ada di Drive; metadata "${deleteTarget.fileName}" dibersihkan.`
+          : `"${deleteTarget.fileName}" berhasil dihapus permanen.`,
       });
     } catch (err) {
       onToast({
@@ -909,7 +959,7 @@ export function AdminMediaPanel({
             const isImg = isImageMimeType(item.mimeType);
             const isVid = isVideoMimeType(item.mimeType);
             const usages = usageMap.get(item.fileId) || [];
-            const proxyUrl = buildMediaProxyUrl(item.fileId, item.visibility);
+            const proxyUrl = buildMediaProxyUrl(item.fileId, item.visibility, item.updatedAt);
             const isToggling = togglingVisibilityId === item.id;
             const isReplacing = replacingBusyId === item.id;
 
@@ -932,10 +982,29 @@ export function AdminMediaPanel({
                       </div>
                     ) : isImg ? (
                       <StudioImage
-                        src={STUDIO_IMAGES.hero}
                         driveFileId={item.fileId}
+                        visibility={item.visibility}
+                        cacheVersion={item.updatedAt}
                         alt={item.altText || item.fileName}
                         aspectClass="w-full h-full"
+                        allowSrcFallback={false}
+                        showErrorDetails
+                        retryKey={retryCounts[item.id] || 0}
+                        onStatusChange={(status, info) => {
+                          setFailedThumbnails((prev) => {
+                            if (status === 'error') {
+                              const nextMsg = info?.errorSummary || 'Media tidak dapat dimuat.';
+                              if (prev[item.id] === nextMsg) return prev;
+                              return { ...prev, [item.id]: nextMsg };
+                            }
+                            if (status === 'loaded' && prev[item.id]) {
+                              const copy = { ...prev };
+                              delete copy[item.id];
+                              return copy;
+                            }
+                            return prev;
+                          });
+                        }}
                         className="group-hover:scale-[1.03]"
                       />
                     ) : isVid ? (
@@ -967,7 +1036,11 @@ export function AdminMediaPanel({
                       ) : (
                         <FileText className="w-2.5 h-2.5 text-[#8ACCD5]" />
                       )}
-                      {isImg ? 'IMG' : isVid ? 'VID' : 'DOC'}
+                      {isImg
+                        ? (item.mimeType.split('/')[1] || 'IMG').toUpperCase().slice(0, 5)
+                        : isVid
+                          ? 'VID'
+                          : 'DOC'}
                     </span>
 
                     {usages.length > 0 && (
@@ -987,28 +1060,35 @@ export function AdminMediaPanel({
                       >
                         {item.fileName}
                       </p>
-                      <button
-                        type="button"
-                        disabled={isToggling}
-                        onClick={() => void handleToggleVisibility(item)}
-                        title="Klik untuk mengubah akses Publik/Privat di Google Drive"
-                        className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold border border-[#171717] rounded-[2px] cursor-pointer ${
-                          item.visibility === 'public'
-                            ? 'bg-[#8ACCD5] text-[#171717]'
-                            : 'bg-[#6C151E] text-[#F8F8E1]'
-                        }`}
-                      >
-                        {item.visibility === 'public' ? (
-                          <Globe className="w-2.5 h-2.5" />
-                        ) : (
-                          <Lock className="w-2.5 h-2.5" />
+                      <div className="flex items-center gap-1 shrink-0">
+                        {item.isPublished === false && (
+                          <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-[#F3C95B] text-[#171717] border border-[#171717] rounded-[2px]">
+                            DRAF
+                          </span>
                         )}
-                        {isToggling
-                          ? '...'
-                          : item.visibility === 'public'
-                            ? 'Publik'
-                            : 'Privat'}
-                      </button>
+                        <button
+                          type="button"
+                          disabled={isToggling}
+                          onClick={() => void handleToggleVisibility(item)}
+                          title="Klik untuk mengubah akses Publik/Privat di Google Drive"
+                          className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold border border-[#171717] rounded-[2px] cursor-pointer ${
+                            item.visibility === 'public'
+                              ? 'bg-[#8ACCD5] text-[#171717]'
+                              : 'bg-[#6C151E] text-[#F8F8E1]'
+                          }`}
+                        >
+                          {item.visibility === 'public' ? (
+                            <Globe className="w-2.5 h-2.5" />
+                          ) : (
+                            <Lock className="w-2.5 h-2.5" />
+                          )}
+                          {isToggling
+                            ? '...'
+                            : item.visibility === 'public'
+                              ? 'Publik'
+                              : 'Privat'}
+                        </button>
+                      </div>
                     </div>
 
                     <p className="text-[11px] font-mono text-[#0F3D3A] truncate">
@@ -1039,6 +1119,23 @@ export function AdminMediaPanel({
                       <Eye className="w-3 h-3" />
                       Lihat
                     </button>
+                    {failedThumbnails[item.id] && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearMediaProbeCache(proxyUrl);
+                          setRetryCounts((prev) => ({
+                            ...prev,
+                            [item.id]: (prev[item.id] || 0) + 1,
+                          }));
+                        }}
+                        title={failedThumbnails[item.id]}
+                        className="nb-btn nb-btn-burgundy px-2 py-1 text-[11px]"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Muat Ulang
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => copyText(proxyUrl, 'URL Proxy')}
@@ -1115,27 +1212,58 @@ export function AdminMediaPanel({
                 <p className="text-xs font-mono text-[#F3C95B] p-6">
                   Memuat berkas privat terautentikasi dari Google Drive...
                 </p>
+              ) : previewItem.visibility === 'private' && privatePreviewError ? (
+                <div className="p-6 text-center space-y-2 text-[#F8F8E1]">
+                  <AlertTriangle className="w-8 h-8 text-[#F3C95B] mx-auto" />
+                  <p className="font-display font-bold text-sm">Gagal Memuat Berkas Privat</p>
+                  <p className="text-xs text-[#F8F8E1]/80 max-w-md">{privatePreviewError}</p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRetryCounts((prev) => ({
+                        ...prev,
+                        [previewItem.id]: (prev[previewItem.id] || 0) + 1,
+                      }))
+                    }
+                    className="nb-btn nb-btn-mustard px-3 py-1.5 text-xs"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Coba Muat Ulang
+                  </button>
+                </div>
               ) : isVideoMimeType(previewItem.mimeType) ? (
                 <video
                   src={
                     previewItem.visibility === 'private'
                       ? privatePreviewUrl || undefined
-                      : buildMediaProxyUrl(previewItem.fileId, 'public')
+                      : buildMediaProxyUrl(previewItem.fileId, 'public', previewItem.updatedAt)
                   }
                   controls
                   playsInline
                   className="max-h-[58vh] w-full object-contain"
                 />
               ) : isImageMimeType(previewItem.mimeType) ? (
-                <img
-                  src={
-                    previewItem.visibility === 'private'
-                      ? privatePreviewUrl || STUDIO_IMAGES.hero
-                      : buildMediaProxyUrl(previewItem.fileId, 'public')
-                  }
-                  alt={previewItem.altText || previewItem.fileName}
-                  className="max-h-[58vh] w-auto object-contain"
-                />
+                previewItem.visibility === 'private' ? (
+                  <img
+                    src={privatePreviewUrl || undefined}
+                    alt={previewItem.altText || previewItem.fileName}
+                    className="max-h-[58vh] w-auto object-contain"
+                  />
+                ) : (
+                  <StudioImage
+                    driveFileId={previewItem.fileId}
+                    visibility={previewItem.visibility}
+                    cacheVersion={previewItem.updatedAt}
+                    alt={previewItem.altText || previewItem.fileName}
+                    aspectClass="w-full h-[52vh] max-h-[58vh]"
+                    fit="contain"
+                    loading="eager"
+                    allowSrcFallback={false}
+                    showErrorDetails
+                    retryKey={retryCounts[previewItem.id] || 0}
+                    className="max-h-[58vh]"
+                  />
+                )
               ) : (
                 <div className="p-8 text-center text-[#F8F8E1] space-y-2">
                   <FileText className="w-10 h-10 text-[#8ACCD5] mx-auto" />
@@ -1255,13 +1383,12 @@ export function AdminMediaPanel({
             </div>
 
             {deleteUsages.length > 0 && (
-              <div className="p-3 bg-[#F3C95B]/60 border-2 border-[#171717] rounded-[4px] space-y-1.5">
+              <div className="p-3 bg-[#6C151E]/10 border-2 border-[#6C151E] rounded-[4px] space-y-1.5">
                 <p className="text-xs font-display font-bold text-[#6C151E]">
-                  Peringatan: Media ini sedang digunakan oleh {deleteUsages.length} konten aktif!
+                  Penghapusan Diblokir: Media masih digunakan oleh {deleteUsages.length} konten aktif!
                 </p>
                 <p className="text-[11px] text-[#171717]">
-                  Jika dilanjutkan, referensi media pada konten berikut akan dibersihkan otomatis agar
-                  tidak menimbulkan gambar rusak:
+                  Demi menjaga gambar publik tidak rusak, lepas atau ganti gambar pada konten berikut terlebih dahulu sebelum menghapus berkas asli dari Google Drive:
                 </p>
                 <ul className="list-disc pl-4 space-y-0.5 text-xs text-[#171717] max-h-32 overflow-y-auto">
                   {deleteUsages.map((u, idx) => (
@@ -1288,21 +1415,19 @@ export function AdminMediaPanel({
                 onClick={() => setDeleteTarget(null)}
                 className="nb-btn nb-btn-surface px-3.5 py-2 text-xs"
               >
-                Batal
+                {deleteUsages.length > 0 ? 'Tutup' : 'Batal'}
               </button>
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={() => void handleConfirmDelete()}
-                className="nb-btn nb-btn-burgundy px-4 py-2 text-xs"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                {deleting
-                  ? 'Menghapus...'
-                  : deleteUsages.length > 0
-                    ? 'Hapus & Bersihkan Referensi'
-                    : 'Hapus Permanen'}
-              </button>
+              {deleteUsages.length === 0 && (
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => void handleConfirmDelete()}
+                  className="nb-btn nb-btn-burgundy px-4 py-2 text-xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {deleting ? 'Menghapus...' : 'Hapus Permanen'}
+                </button>
+              )}
             </div>
           </div>
         </div>

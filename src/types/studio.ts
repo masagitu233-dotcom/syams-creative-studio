@@ -191,7 +191,17 @@ export interface ActivityLog {
   actorUid: string;
   actorEmail: string;
   action: string;
-  entityType: 'order' | 'service' | 'product' | 'portfolio' | 'media' | 'faq' | 'site_settings' | 'admin' | 'contact';
+  entityType:
+    | 'order'
+    | 'service'
+    | 'product'
+    | 'portfolio'
+    | 'media'
+    | 'faq'
+    | 'site_settings'
+    | 'site_design'
+    | 'admin'
+    | 'contact';
   entityId: string;
   summary: string;
   createdAt?: unknown;

@@ -1,11 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  appendMediaCacheVersion,
+  buildDrivePublicCdnUrl,
+  buildMediaImageCandidates,
   buildMediaProxyUrl,
   buildProductWhatsappMessage,
+  canDeleteMediaAsset,
+  classifyMediaHttpFailure,
   computeCatalogStats,
   computeOrderStats,
   DEFAULT_VISUAL_THEME,
+  extractDriveFileId,
+  extractMediaCacheVersion,
   filterAndSortOrders,
   filterDigitalProducts,
   findMediaUsages,
@@ -13,9 +20,11 @@ import {
   formatServicePriceLabel,
   generateOrderCode,
   getProductGridColsClass,
+  isPublicPublishedMediaAsset,
   isValidVisualTheme,
   isValidWhatsappNumber,
   isVideoMimeType,
+  normalizeMediaCacheVersion,
   normalizeVisualTheme,
   normalizeWhatsappNumber,
   promoteGalleryItemToPrimary,
@@ -31,6 +40,7 @@ import {
   validateMediaFileBeforeUpload,
   validateOptionalSocialUrls,
   validateOrderInput,
+  validatePortfolioInput,
   validateServiceInput,
   VISUAL_THEME_OPTIONS,
   writeCachedVisualTheme,
@@ -654,6 +664,184 @@ test('validateOptionalSocialUrls and sanitizeHttpUrl allow empty/partial social 
   assert.equal(sanitizeHttpUrl('javascript:alert(1)'), '');
   assert.equal(sanitizeHttpUrl('https://instagram.com/syams'), 'https://instagram.com/syams');
 });
+
+test('extractDriveFileId and buildDrivePublicCdnUrl normalize Drive URLs, proxy URLs, and raw IDs cleanly', () => {
+  const sampleId = '1AbCdEfGhIjKlMnOpQrStUvWxYz';
+  assert.equal(extractDriveFileId(sampleId), sampleId);
+  assert.equal(extractDriveFileId(`/api/media/${sampleId}?visibility=public`), sampleId);
+  assert.equal(
+    extractDriveFileId(`https://drive.google.com/file/d/${sampleId}/view?usp=sharing`),
+    sampleId
+  );
+  assert.equal(extractDriveFileId(`https://drive.google.com/open?id=${sampleId}`), sampleId);
+  assert.equal(
+    extractDriveFileId(`https://lh3.googleusercontent.com/d/${sampleId}=w1600`),
+    sampleId
+  );
+  assert.equal(extractDriveFileId('https://example.com/photo.jpg'), '');
+
+  assert.equal(
+    buildDrivePublicCdnUrl(sampleId, 'thumbnail'),
+    `https://drive.google.com/thumbnail?id=${sampleId}&sz=w1600`
+  );
+  assert.equal(
+    buildDrivePublicCdnUrl(sampleId, 'lh3'),
+    `https://lh3.googleusercontent.com/d/${sampleId}=w1600`
+  );
+  assert.equal(buildDrivePublicCdnUrl('../bad', 'thumbnail'), '');
+});
+
+test('buildMediaImageCandidates builds proxy -> CDN -> fallback chain for public images and strictly guards private files', () => {
+  const sampleId = '1AbCdEfGhIjKlMnOpQrStUvWxYz';
+
+  // Public Drive image with unrelated fallback src
+  const pubWithFallback = buildMediaImageCandidates({
+    driveFileId: sampleId,
+    src: '/src/assets/images/hero.jpg',
+    visibility: 'public',
+    allowSrcFallback: true,
+  });
+  assert.deepEqual(
+    pubWithFallback.map((c) => c.source),
+    ['proxy', 'drive_thumbnail', 'drive_lh3', 'src_fallback']
+  );
+  assert.equal(pubWithFallback[0].url, `/api/media/${sampleId}`);
+
+  // Media Manager / Picker mode: allowSrcFallback=false must NOT mask broken Drive images behind fallback assets
+  const managerOnly = buildMediaImageCandidates({
+    driveFileId: sampleId,
+    src: '/src/assets/images/hero.jpg',
+    visibility: 'public',
+    allowSrcFallback: false,
+  });
+  assert.deepEqual(
+    managerOnly.map((c) => c.source),
+    ['proxy', 'drive_thumbnail', 'drive_lh3']
+  );
+
+  // Private files MUST ONLY use authenticated proxy URL and never public Drive CDN
+  const priv = buildMediaImageCandidates({
+    driveFileId: sampleId,
+    src: '/src/assets/images/hero.jpg',
+    visibility: 'private',
+    allowSrcFallback: false,
+  });
+  assert.deepEqual(priv, [{ url: `/api/media/${sampleId}?visibility=private`, source: 'proxy' }]);
+
+  // Pasted Google Drive viewer link extracts ID and excludes non-image viewer HTML URL
+  const pastedViewer = buildMediaImageCandidates({
+    src: `https://drive.google.com/file/d/${sampleId}/view?usp=sharing`,
+    visibility: 'public',
+  });
+  assert.deepEqual(
+    pastedViewer.map((c) => c.source),
+    ['proxy', 'drive_thumbnail', 'drive_lh3']
+  );
+});
+
+test('classifyMediaHttpFailure identifies Drive API, permissions, Netlify SPA fallback, and URL errors', () => {
+  assert.equal(classifyMediaHttpFailure({ status: 401 }).source, 'file_permissions');
+  assert.equal(classifyMediaHttpFailure({ status: 403 }).source, 'file_permissions');
+  assert.equal(classifyMediaHttpFailure({ status: 404 }).source, 'google_drive_api');
+  assert.equal(classifyMediaHttpFailure({ status: 503 }).source, 'google_drive_api');
+  assert.equal(
+    classifyMediaHttpFailure({ status: 200, contentType: 'text/html; charset=utf-8' }).source,
+    'netlify_function'
+  );
+  assert.equal(classifyMediaHttpFailure({ status: 400 }).source, 'image_url');
+});
+
+test('per-asset cache version helpers update only targeted URLs without affecting unrelated assets', () => {
+  const fileId = '1AbCdEfGhIjKlMnOpQr';
+  assert.equal(normalizeMediaCacheVersion(1732670000123), '1732670000123');
+  assert.equal(normalizeMediaCacheVersion({ toMillis: () => 1732670000999 }), '1732670000999');
+
+  const versioned = appendMediaCacheVersion(`/api/media/${fileId}`, 1732670000123);
+  assert.equal(versioned, `/api/media/${fileId}?v=1732670000123`);
+  assert.equal(extractMediaCacheVersion(versioned), '1732670000123');
+
+  // Re-versioning replaces ?v= cleanly without duplicating query keys
+  const reVersioned = appendMediaCacheVersion(versioned, 1732670009999);
+  assert.equal(reVersioned, `/api/media/${fileId}?v=1732670009999`);
+
+  assert.equal(
+    buildMediaProxyUrl(fileId, 'public', 1732670000123),
+    `/api/media/${fileId}?v=1732670000123`
+  );
+  assert.equal(
+    buildMediaProxyUrl(fileId, 'private', 1732670000123),
+    `/api/media/${fileId}?visibility=private&v=1732670000123`
+  );
+
+  // Local static assets remain untouched
+  assert.equal(
+    appendMediaCacheVersion('/src/assets/images/hero.jpg', 1732670000123),
+    '/src/assets/images/hero.jpg'
+  );
+
+  // buildMediaImageCandidates propagates cacheVersion to proxy candidate only
+  const candidates = buildMediaImageCandidates({
+    driveFileId: fileId,
+    src: `/api/media/${fileId}`,
+    visibility: 'public',
+    cacheVersion: 1732670000555,
+  });
+  assert.equal(candidates[0].url, `/api/media/${fileId}?v=1732670000555`);
+});
+
+test('validatePortfolioInput rejects removed empty thumbnail and unsafe project URLs while accepting valid items', () => {
+  const missingThumb = validatePortfolioInput({
+    title: 'Portal Berita Sekolah',
+    clientName: 'SMA Negeri 1',
+    category: 'web_app',
+    year: '2026',
+    summary: 'Portal berita dan agenda sekolah dengan pencarian cepat.',
+    outcome: 'Waktu publikasi artikel turun 60%.',
+    metrics: '12.000+ pembaca/bulan',
+    imageUrl: '',
+    projectUrl: 'javascript:alert(1)',
+  });
+  assert.equal(missingThumb.valid, false);
+  assert.ok(missingThumb.errors.imageUrl);
+  assert.ok(missingThumb.errors.projectUrl);
+
+  const valid = validatePortfolioInput({
+    title: 'Portal Berita Sekolah',
+    clientName: 'SMA Negeri 1',
+    category: 'web_app',
+    year: '2026',
+    summary: 'Portal berita dan agenda sekolah dengan pencarian cepat.',
+    outcome: 'Waktu publikasi artikel turun 60%.',
+    metrics: '12.000+ pembaca/bulan',
+    imageUrl: '/api/media/1AbCdEfGhIjKlMnOpQr?v=1732670000555',
+    projectUrl: 'https://sman1.example.id',
+  });
+  assert.equal(valid.valid, true);
+  assert.deepEqual(valid.errors, {});
+});
+
+test('isPublicPublishedMediaAsset and canDeleteMediaAsset enforce draft visibility and safe deletion rules', () => {
+  assert.equal(isPublicPublishedMediaAsset({ visibility: 'public', isPublished: true }), true);
+  assert.equal(isPublicPublishedMediaAsset({ visibility: 'public', isPublished: undefined }), true);
+  assert.equal(isPublicPublishedMediaAsset({ visibility: 'public', isPublished: false }), false);
+  assert.equal(isPublicPublishedMediaAsset({ visibility: 'private', isPublished: true }), false);
+
+  const allowed = canDeleteMediaAsset([]);
+  assert.equal(allowed.allowed, true);
+
+  const blocked = canDeleteMediaAsset([
+    {
+      entityType: 'product',
+      entityId: 'prod-1',
+      entityTitle: 'Template PPT Bisnis',
+      role: 'primary',
+    },
+  ]);
+  assert.equal(blocked.allowed, false);
+  assert.ok(blocked.reason && blocked.reason.includes('1 konten aktif'));
+});
+
+
 
 
 

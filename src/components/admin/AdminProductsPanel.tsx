@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  AlertTriangle,
   ExternalLink,
   Eye,
   EyeOff,
@@ -77,7 +78,17 @@ export function AdminProductsPanel({
 }: AdminProductsPanelProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_PRODUCT_FORM);
+  const [savedBaseline, setSavedBaseline] = useState<{
+    imageUrl: string;
+    driveFileId: string;
+    gallery: MediaGalleryItem[];
+  }>({
+    imageUrl: EMPTY_PRODUCT_FORM.imageUrl,
+    driveFileId: '',
+    gallery: [],
+  });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [failedThumbs, setFailedThumbs] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DigitalProductItem | null>(null);
@@ -92,6 +103,11 @@ export function AdminProductsPanel({
       setForm({
         ...EMPTY_PRODUCT_FORM,
         sortOrder: products.length + 1,
+      });
+      setSavedBaseline({
+        imageUrl: EMPTY_PRODUCT_FORM.imageUrl,
+        driveFileId: '',
+        gallery: [],
       });
       setFormErrors({});
       setFormOpen(true);
@@ -120,6 +136,11 @@ export function AdminProductsPanel({
       ...EMPTY_PRODUCT_FORM,
       sortOrder: products.length + 1,
     });
+    setSavedBaseline({
+      imageUrl: EMPTY_PRODUCT_FORM.imageUrl,
+      driveFileId: '',
+      gallery: [],
+    });
     setFormErrors({});
     setFormOpen(true);
   }
@@ -144,6 +165,11 @@ export function AdminProductsPanel({
       sortOrder: item.sortOrder,
       isFeatured: item.isFeatured,
       isPublished: item.isPublished,
+    });
+    setSavedBaseline({
+      imageUrl: item.imageUrl,
+      driveFileId: item.driveFileId || '',
+      gallery: item.gallery || [],
     });
     setFormErrors({});
     setFormOpen(true);
@@ -494,6 +520,11 @@ export function AdminProductsPanel({
           <AdminImagePicker
             imageUrl={form.imageUrl}
             driveFileId={form.driveFileId}
+            savedImageUrl={savedBaseline.imageUrl}
+            savedDriveFileId={savedBaseline.driveFileId}
+            savedGallery={savedBaseline.gallery}
+            entityKey={form.id || 'new-product'}
+            entityPublished={form.isPublished}
             usage="product"
             media={media}
             driveFolders={driveFolders}
@@ -502,9 +533,12 @@ export function AdminProductsPanel({
             gallery={form.gallery}
             onGalleryChange={(gallery) => setForm((f) => ({ ...f, gallery }))}
             actor={actor}
-            onChange={({ imageUrl, driveFileId }) =>
-              setForm((f) => ({ ...f, imageUrl, driveFileId }))
-            }
+            onChange={({ imageUrl, driveFileId }) => {
+              setForm((f) => ({ ...f, imageUrl, driveFileId }));
+              if (formErrors.imageUrl) {
+                setFormErrors((prev) => ({ ...prev, imageUrl: '' }));
+              }
+            }}
             onMediaUploaded={onRefresh}
             onToast={onToast}
           />
@@ -707,18 +741,37 @@ export function AdminProductsPanel({
                   <tr key={item.id} className="hover:bg-[#F8F8E1]/40">
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2.5 min-w-[220px]">
-                        <div className="w-14 shrink-0 border-2 border-[#171717] rounded-[2px] overflow-hidden bg-white">
+                        <div className="relative w-14 shrink-0 border-2 border-[#171717] rounded-[2px] overflow-hidden bg-white">
                           <StudioImage
                             src={item.imageUrl}
                             driveFileId={item.driveFileId}
+                            cacheVersion={item.updatedAt}
                             alt={item.title}
                             aspectClass="aspect-[16/10]"
+                            onStatusChange={(status) => {
+                              setFailedThumbs((prev) => {
+                                const nextErr = status === 'error';
+                                if (Boolean(prev[item.id]) === nextErr) return prev;
+                                return { ...prev, [item.id]: nextErr };
+                              });
+                            }}
                           />
+                          {failedThumbs[item.id] && (
+                            <span
+                              title="Thumbnail gagal dimuat — klik Edit untuk memeriksa"
+                              className="absolute top-0.5 right-0.5 w-4 h-4 bg-[#6C151E] text-[#F8F8E1] rounded-[2px] flex items-center justify-center"
+                            >
+                              <AlertTriangle className="w-2.5 h-2.5" />
+                            </span>
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="font-semibold text-[#171717] line-clamp-1">{item.title}</p>
                           <p className="text-[11px] font-mono text-[#525252] truncate">
                             /produk/{item.slug} · {item.format}
+                            {item.gallery && item.gallery.length > 0
+                              ? ` · +${item.gallery.length} galeri`
+                              : ''}
                           </p>
                         </div>
                       </div>

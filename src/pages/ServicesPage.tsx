@@ -2,10 +2,15 @@ import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Search } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
+import { useDesign } from '../contexts/DesignContext';
 import { ServiceCard } from '../components/ServiceCard';
 import { ServiceCardSkeleton } from '../components/SkeletonCard';
-import { VelocityLayer } from '../components/ScrollMotionPrimitives';
-import { CATALOG_GRID_COLS_CLASS, SERVICE_CATEGORY_LABELS } from '../utils/studioLogic';
+import { FadeScroll } from '../components/FadeScroll';
+import { SERVICE_CATEGORY_LABELS } from '../utils/studioLogic';
+import {
+  resolveCollectionGridLayout,
+  resolveSectionContainerStyle,
+} from '../utils/designSystem';
 import type { ServiceCategory } from '../types/studio';
 
 const CATEGORIES: { value: ServiceCategory | 'all'; label: string }[] = [
@@ -19,6 +24,7 @@ const CATEGORIES: { value: ServiceCategory | 'all'; label: string }[] = [
 
 export function ServicesPage() {
   const { services, loadingServices } = useStudioData();
+  const { design, viewport } = useDesign();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialCat = (searchParams.get('kategori') as ServiceCategory | 'all') || 'all';
   const [category, setCategory] = useState<ServiceCategory | 'all'>(
@@ -26,7 +32,15 @@ export function ServicesPage() {
   );
   const [search, setSearch] = useState('');
 
-  const filteredServices = useMemo(() => {
+  const section = design.services.section;
+  const { sectionStyle, containerStyle, alignClass } = resolveSectionContainerStyle(
+    section,
+    design.global,
+    viewport,
+    design.responsive
+  );
+
+  const filteredAll = useMemo(() => {
     const q = search.trim().toLowerCase();
     return services.filter((srv) => {
       if (category !== 'all' && srv.category !== category) return false;
@@ -39,6 +53,18 @@ export function ServicesPage() {
     });
   }, [services, category, search]);
 
+  const filteredServices =
+    section.maxItems > 0 ? filteredAll.slice(0, section.maxItems) : filteredAll;
+
+  const grid = resolveCollectionGridLayout({
+    layout: section.layout,
+    colsDesktop: section.colsDesktop,
+    colsTablet: section.colsTablet,
+    colsMobile: section.colsMobile,
+    gapPx: section.gapPx,
+    viewport,
+  });
+
   function handleSelectCategory(val: ServiceCategory | 'all') {
     setCategory(val);
     if (val === 'all') {
@@ -49,11 +75,20 @@ export function ServicesPage() {
   }
 
   return (
-    <div className="nb-catalog-section">
-      <div className="nb-container space-y-3.5 sm:space-y-4">
+    <div className="nb-catalog-section" style={sectionStyle}>
+      <div className="nb-container space-y-3.5 sm:space-y-4" style={containerStyle}>
         {/* Compact Category Header */}
-        <header className="space-y-1.5">
-          <nav aria-label="Breadcrumb" className="nb-breadcrumb">
+        <header className={`space-y-1.5 ${alignClass}`}>
+          <nav
+            aria-label="Breadcrumb"
+            className={`nb-breadcrumb ${
+              section.textAlign === 'center'
+                ? 'justify-center'
+                : section.textAlign === 'right'
+                  ? 'justify-end'
+                  : ''
+            }`}
+          >
             <Link to="/" className="hover:text-[#0F3D3A] font-medium transition-colors">
               Beranda
             </Link>
@@ -61,16 +96,40 @@ export function ServicesPage() {
             <span className="text-[#171717] font-semibold">Layanan Jasa</span>
           </nav>
 
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+          <div
+            className={`flex flex-col ${
+              section.textAlign === 'center'
+                ? 'items-center text-center'
+                : 'sm:flex-row sm:items-end justify-between'
+            } gap-2`}
+          >
             <div className="space-y-0.5">
-              <h1 className="font-display font-bold text-lg sm:text-xl lg:text-[1.35rem] text-[#171717] leading-tight">
-                Katalog Layanan Jasa Digital
+              <h1
+                className="font-display font-bold text-lg sm:text-xl lg:text-[1.35rem] text-[#171717] leading-tight"
+                style={{
+                  ...(section.headingSizePx > 0 ? { fontSize: `${section.headingSizePx}px` } : {}),
+                  ...(section.textColor ? { color: section.textColor } : {}),
+                }}
+              >
+                {section.customTitle?.trim() || 'Katalog Layanan Jasa Digital'}
               </h1>
-              <p className="text-xs text-[#404040] leading-relaxed">
-                Harga tercantum adalah estimasi awal; biaya final dikonfirmasi admin setelah brief ditinjau.
+              <p
+                className="text-xs text-[#404040] leading-relaxed"
+                style={{
+                  ...(section.descriptionSizePx > 0
+                    ? { fontSize: `${section.descriptionSizePx}px` }
+                    : {}),
+                  ...(section.textColor ? { color: section.textColor, opacity: 0.8 } : {}),
+                }}
+              >
+                {section.customSubtitle?.trim() ||
+                  'Harga tercantum adalah estimasi awal; biaya final dikonfirmasi admin setelah brief ditinjau.'}
               </p>
             </div>
-            <p className="text-xs font-mono font-semibold text-[#0F3D3A] tabular-nums shrink-0">
+            <p
+              className="text-xs font-mono font-semibold text-[#0F3D3A] tabular-nums shrink-0"
+              style={section.accentColor ? { color: section.accentColor } : undefined}
+            >
               {filteredServices.length} layanan
             </p>
           </div>
@@ -116,10 +175,10 @@ export function ServicesPage() {
           </div>
         </div>
 
-        {/* Dense Symmetrical 5-Col Desktop / 3-Col Tablet / 2-Col Phone Grid */}
+        {/* Dynamic Responsive Collection */}
         {loadingServices ? (
-          <div className={`grid ${CATALOG_GRID_COLS_CLASS} gap-2.5 sm:gap-3 items-stretch`}>
-            {Array.from({ length: 5 }).map((_, idx) => (
+          <div className={grid.className} style={grid.style}>
+            {Array.from({ length: Math.min(5, grid.activeCols) }).map((_, idx) => (
               <ServiceCardSkeleton key={idx} />
             ))}
           </div>
@@ -143,19 +202,18 @@ export function ServicesPage() {
             </button>
           </div>
         ) : (
-          <div className={`grid ${CATALOG_GRID_COLS_CLASS} gap-2.5 sm:gap-3 items-stretch`}>
+          <div className={grid.className} style={grid.style}>
             {filteredServices.map((srv, idx) => (
-              <VelocityLayer
+              <FadeScroll
                 key={srv.id}
-                speed={[-0.08, 0.02, 0.1, 0.02, -0.08][idx % 5]}
-                velocityFactor={[0.55, 0.9, 1.25, 0.9, 0.55][idx % 5]}
-                maxOffsetPx={18}
-                maxVelocityShiftPx={24}
-                maxSkewDeg={1.2}
-                className="h-full"
+                index={idx}
+                columnsPerRow={grid.activeCols}
+                className={`h-full ${
+                  grid.isHorizontal ? 'w-64 shrink-0 snap-start' : ''
+                } ${grid.isBento && idx === 0 && grid.activeCols >= 2 ? 'sm:col-span-2' : ''}`}
               >
-                <ServiceCard service={srv} />
-              </VelocityLayer>
+                <ServiceCard service={srv} forceList={grid.isList} />
+              </FadeScroll>
             ))}
           </div>
         )}

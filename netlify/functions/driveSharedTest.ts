@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Readable } from 'node:stream';
 import {
   buildEntityFolderKey,
   buildEntityFolderName,
   classifyDriveError,
+  coerceDriveBinaryToBuffer,
   escapeDriveQueryValue,
+  extractMediaParamsFromEvent,
   isTrustedGoogleUploadUrl,
   isValidDriveId,
   signResumableSession,
@@ -13,6 +16,7 @@ import {
   type NetlifyEvent,
   type NetlifyResponse,
 } from './_driveShared';
+import { handler as mediaHandler } from './media';
 
 function runUploadMetadataChecks() {
   assert.equal(isValidDriveId('1AbCdEf_234-xyz'), true);
@@ -147,6 +151,67 @@ function runDriveErrorAndQueryChecks() {
   assert.equal(notFoundErr.status, 404);
 }
 
+function runMediaProxyParamExtractionChecks() {
+  const fromQuery = extractMediaParamsFromEvent({
+    httpMethod: 'GET',
+    headers: {},
+    queryStringParameters: { fileId: '1AbCdEf_12345', visibility: 'private' },
+    body: null,
+  });
+  assert.equal(fromQuery.fileId, '1AbCdEf_12345');
+  assert.equal(fromQuery.visibility, 'private');
+
+  const fromRawQuery = extractMediaParamsFromEvent({
+    httpMethod: 'GET',
+    headers: {},
+    rawQuery: 'fileId=1XyZ_98765&visibility=public',
+    body: null,
+  });
+  assert.equal(fromRawQuery.fileId, '1XyZ_98765');
+  assert.equal(fromRawQuery.visibility, 'public');
+
+  const fromPath = extractMediaParamsFromEvent({
+    httpMethod: 'GET',
+    headers: {},
+    path: '/api/media/1PathDriveId_999',
+    rawUrl: 'https://syams.netlify.app/api/media/1PathDriveId_999?visibility=private',
+    body: null,
+  });
+  assert.equal(fromPath.fileId, '1PathDriveId_999');
+  assert.equal(fromPath.visibility, 'private');
+}
+
+async function runBinaryCoercionAndMediaGuardChecks() {
+  const fromBuf = await coerceDriveBinaryToBuffer(Buffer.from([1, 2, 3]));
+  assert.deepEqual([...fromBuf], [1, 2, 3]);
+
+  const ab = new Uint8Array([4, 5, 6]).buffer;
+  const fromAb = await coerceDriveBinaryToBuffer(ab);
+  assert.deepEqual([...fromAb], [4, 5, 6]);
+
+  const fromBlob = await coerceDriveBinaryToBuffer(new Blob([new Uint8Array([7, 8, 9])]));
+  assert.deepEqual([...fromBlob], [7, 8, 9]);
+
+  const fromStream = await coerceDriveBinaryToBuffer(Readable.from([Buffer.from([10, 11])]));
+  assert.deepEqual([...fromStream], [10, 11]);
+
+  const invalidRes = await mediaHandler({
+    httpMethod: 'GET',
+    headers: {},
+    queryStringParameters: { fileId: '../bad' },
+    body: null,
+  });
+  assert.equal(invalidRes.statusCode, 400);
+
+  const unauthPrivateRes = await mediaHandler({
+    httpMethod: 'GET',
+    headers: {},
+    queryStringParameters: { fileId: '1AbCdEf_12345', visibility: 'private' },
+    body: null,
+  });
+  assert.equal(unauthPrivateRes.statusCode, 401);
+}
+
 const DRIVE_SHARED_SUITES = [
   {
     name: 'Drive backend validates file IDs, MIME types, extensions, and size limits',
@@ -159,6 +224,14 @@ const DRIVE_SHARED_SUITES = [
   {
     name: 'Drive error classifier and folder query escaping handle edge cases cleanly',
     run: runDriveErrorAndQueryChecks,
+  },
+  {
+    name: 'Media proxy extracts fileId and visibility from query, rawQuery, path, and rawUrl',
+    run: runMediaProxyParamExtractionChecks,
+  },
+  {
+    name: 'Media proxy coerces binary payloads safely and enforces validation/auth guards',
+    run: runBinaryCoercionAndMediaGuardChecks,
   },
 ];
 
@@ -185,7 +258,7 @@ export async function handler(event: NetlifyEvent): Promise<NetlifyResponse> {
   const results: { name: string; passed: boolean; error?: string }[] = [];
   for (const suite of DRIVE_SHARED_SUITES) {
     try {
-      suite.run();
+      await suite.run();
       results.push({ name: suite.name, passed: true });
     } catch (err) {
       results.push({

@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Lock, MessageSquare } from 'lucide-react';
 import { SectionHeader } from '../components/SectionHeader';
-import { Reveal } from '../components/Reveal';
-import { VelocityLayer } from '../components/ScrollMotionPrimitives';
+import { FadeScroll } from '../components/FadeScroll';
+import { useDesign } from '../contexts/DesignContext';
 
 const DETAILED_STEPS = [
   {
@@ -58,28 +58,55 @@ const DETAILED_STEPS = [
 ];
 
 export function OrderProcedurePage() {
+  const { design, viewport } = useDesign();
+  const cfg = design.otherPages.procedure;
+  const padY = Math.round(cfg.paddingYPx * design.responsive[viewport].sectionPaddingScale);
+
+  const activeCols =
+    cfg.layout === 'list'
+      ? 1
+      : viewport === 'mobile'
+        ? cfg.colsMobile
+        : viewport === 'tablet'
+          ? cfg.colsTablet
+          : cfg.colsDesktop;
+
   return (
-    <div className="nb-section">
-      <div className="nb-container space-y-6">
-        <Reveal>
+    <div
+      className="nb-section"
+      style={{
+        paddingTop: `${padY}px`,
+        paddingBottom: `${padY}px`,
+        ...(cfg.backgroundColor ? { backgroundColor: cfg.backgroundColor } : {}),
+      }}
+    >
+      <div
+        className="nb-container space-y-6"
+        style={{
+          maxWidth: `${cfg.maxWidthPx > 0 ? cfg.maxWidthPx : design.global.containerMaxWidthPx}px`,
+        }}
+      >
+        <FadeScroll index={0}>
           <SectionHeader
             asPageTitle
             kicker="Prosedur Pemesanan"
             title="Alur Pemesanan yang Jelas, Aman, dan Transparan"
             subtitle="Setiap tahap tercatat rapi mulai dari pengisian brief, konfirmasi harga oleh admin, hingga serah terima hasil akhir."
           />
-        </Reveal>
+        </FadeScroll>
 
-        {/* Symmetrical 2-col / 3-col Step Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+        {/* Dynamic Step Cards Grid or List */}
+        <div
+          className="grid gap-4 items-stretch"
+          style={{
+            gridTemplateColumns: `repeat(${activeCols}, minmax(0, 1fr))`,
+          }}
+        >
           {DETAILED_STEPS.map((step, idx) => (
-            <VelocityLayer
+            <FadeScroll
               key={step.number}
-              speed={[-0.08, 0.06, -0.08][idx % 3]}
-              velocityFactor={0.55 + (idx % 3) * 0.28}
-              maxOffsetPx={16}
-              maxVelocityShiftPx={22}
-              maxSkewDeg={1.0}
+              index={idx}
+              columnsPerRow={activeCols}
               className="h-full"
             >
               <div className="nb-card p-4 sm:p-5 flex flex-col gap-3 h-full">
@@ -103,60 +130,68 @@ export function OrderProcedurePage() {
                   ))}
                 </ul>
               </div>
-            </VelocityLayer>
+            </FadeScroll>
           ))}
 
-          {/* 6th Balanced CTA Slot in 3x2 Grid */}
-          <div className="bg-[#0F3D3A] text-[#F8F8E1] border-2 border-[#171717] nb-shadow rounded-[4px] p-4 sm:p-5 flex flex-col justify-between gap-4 h-full">
-            <div className="space-y-1.5">
-              <p className="font-mono text-xs text-[#F3C95B]">Siap Memulai?</p>
-              <h2 className="font-display font-bold text-lg leading-snug">
-                Kirim Brief & Dapatkan Kode Pesanan Anda
-              </h2>
-              <p className="text-xs text-[#F8F8E1]/85 leading-relaxed">
-                Admin akan segera meninjau kebutuhan proyek dan mengonfirmasi estimasi biaya
-                finalnya.
-              </p>
+          {/* 6th Balanced CTA Slot */}
+          <FadeScroll index={5} columnsPerRow={activeCols} className="h-full">
+            <div className="bg-[#0F3D3A] text-[#F8F8E1] border-2 border-[#171717] nb-shadow rounded-[4px] p-4 sm:p-5 flex flex-col justify-between gap-4 h-full">
+              <div className="space-y-1.5">
+                <p className="font-mono text-xs text-[#F3C95B]">Siap Memulai?</p>
+                <h2 className="font-display font-bold text-lg leading-snug">
+                  Kirim Brief &amp; Dapatkan Kode Pesanan Anda
+                </h2>
+                <p className="text-xs text-[#F8F8E1]/85 leading-relaxed">
+                  Admin akan segera meninjau kebutuhan proyek dan mengonfirmasi estimasi biaya
+                  finalnya.
+                </p>
+              </div>
+              <Link to="/checkout" className="nb-btn nb-btn-mustard nb-btn-md w-full">
+                Mulai Checkout
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
-            <Link to="/checkout" className="nb-btn nb-btn-mustard nb-btn-md w-full">
-              Mulai Checkout
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
+          </FadeScroll>
         </div>
 
         {/* Compact Symmetrical Trust Guarantees */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-          <div className="nb-card-cream p-4 sm:p-5 flex items-start gap-3 h-full">
-            <div className="w-8 h-8 shrink-0 bg-[#8ACCD5] border-2 border-[#171717] rounded-[2px] flex items-center justify-center">
-              <Lock className="w-4 h-4 text-[#171717]" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="font-display font-bold text-sm sm:text-base text-[#171717]">
-                Privasi Data & Berkas Terjamin
-              </h3>
-              <p className="text-xs sm:text-sm text-[#404040] leading-relaxed">
-                Nomor WhatsApp, detail brief, dan lampiran hanya dapat diakses oleh akun pelanggan
-                pemilik pesanan dan administrator resmi studio.
-              </p>
-            </div>
-          </div>
+        {cfg.showGuarantees && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+            <FadeScroll index={0} columnsPerRow={2} className="h-full">
+              <div className="nb-card-cream p-4 sm:p-5 flex items-start gap-3 h-full">
+                <div className="w-8 h-8 shrink-0 bg-[#8ACCD5] border-2 border-[#171717] rounded-[2px] flex items-center justify-center">
+                  <Lock className="w-4 h-4 text-[#171717]" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-display font-bold text-sm sm:text-base text-[#171717]">
+                    Privasi Data &amp; Berkas Terjamin
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#404040] leading-relaxed">
+                    Nomor WhatsApp, detail brief, dan lampiran hanya dapat diakses oleh akun pelanggan
+                    pemilik pesanan dan administrator resmi studio.
+                  </p>
+                </div>
+              </div>
+            </FadeScroll>
 
-          <div className="nb-card-cream p-4 sm:p-5 flex items-start gap-3 h-full">
-            <div className="w-8 h-8 shrink-0 bg-[#F3C95B] border-2 border-[#171717] rounded-[2px] flex items-center justify-center">
-              <MessageSquare className="w-4 h-4 text-[#171717]" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="font-display font-bold text-sm sm:text-base text-[#171717]">
-                Konfirmasi Manual Tanpa Biaya Tersembunyi
-              </h3>
-              <p className="text-xs sm:text-sm text-[#404040] leading-relaxed">
-                Tidak ada tagihan otomatis sebelum Anda menyetujui rincian biaya final yang
-                disampaikan admin studio.
-              </p>
-            </div>
+            <FadeScroll index={1} columnsPerRow={2} className="h-full">
+              <div className="nb-card-cream p-4 sm:p-5 flex items-start gap-3 h-full">
+                <div className="w-8 h-8 shrink-0 bg-[#F3C95B] border-2 border-[#171717] rounded-[2px] flex items-center justify-center">
+                  <MessageSquare className="w-4 h-4 text-[#171717]" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-display font-bold text-sm sm:text-base text-[#171717]">
+                    Konfirmasi Manual Tanpa Biaya Tersembunyi
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#404040] leading-relaxed">
+                    Tidak ada tagihan otomatis sebelum Anda menyetujui rincian biaya final yang
+                    disampaikan admin studio.
+                  </p>
+                </div>
+              </div>
+            </FadeScroll>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

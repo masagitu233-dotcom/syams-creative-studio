@@ -1,18 +1,25 @@
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Clock, ShieldCheck } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
+import { useDesign } from '../contexts/DesignContext';
 import { StudioImage } from '../components/StudioImage';
 import { MediaGallerySection } from '../components/MediaGallerySection';
 import { ServiceCard } from '../components/ServiceCard';
 import { SectionHeader } from '../components/SectionHeader';
-import { CATALOG_GRID_COLS_CLASS, SERVICE_CATEGORY_LABELS } from '../utils/studioLogic';
+import { FadeScroll } from '../components/FadeScroll';
+import { SERVICE_CATEGORY_LABELS } from '../utils/studioLogic';
+import { getAspectClass } from '../utils/designSystem';
 
 export function ServiceDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { services, loadingServices } = useStudioData();
+  const { design, viewport } = useDesign();
+  const detailCfg = design.otherPages.detailPages;
 
   const service = services.find((item) => item.slug === slug || item.id === slug);
-  const otherServices = services.filter((item) => item.id !== service?.id).slice(0, 5);
+  const otherServices = services
+    .filter((item) => item.id !== service?.id)
+    .slice(0, detailCfg.relatedColsDesktop);
 
   if (loadingServices && !service) {
     return (
@@ -48,9 +55,25 @@ export function ServiceDetailPage() {
     );
   }
 
+  const isTopImage = detailCfg.imagePosition === 'top' || viewport !== 'desktop';
+  const isRightImage = detailCfg.imagePosition === 'right' && viewport === 'desktop';
+  const aspectClass = getAspectClass(detailCfg.imageAspectRatio);
+
+  const relatedCols =
+    viewport === 'mobile'
+      ? 2
+      : viewport === 'tablet'
+        ? Math.min(3, detailCfg.relatedColsDesktop)
+        : detailCfg.relatedColsDesktop;
+
   return (
     <div className="nb-section">
-      <div className="nb-container space-y-6">
+      <div
+        className="nb-container space-y-6"
+        style={{
+          maxWidth: `${detailCfg.maxWidthPx > 0 ? detailCfg.maxWidthPx : design.global.containerMaxWidthPx}px`,
+        }}
+      >
         {/* Compact Breadcrumb */}
         <nav aria-label="Breadcrumb" className="nb-breadcrumb">
           <Link to="/" className="hover:text-[#0F3D3A] font-medium transition-colors">
@@ -66,23 +89,40 @@ export function ServiceDetailPage() {
           </span>
         </nav>
 
-        {/* Compact Horizontal Primary Overview Card */}
+        {/* Primary Overview Card */}
         <div className="nb-card overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
+          <div className={`grid items-stretch ${isTopImage ? 'grid-cols-1' : 'grid-cols-12'}`}>
             {/* Controlled Preview Image Frame */}
-            <div className="lg:col-span-5 border-b-2 lg:border-b-0 lg:border-r-2 border-[#171717] bg-[#F1F1D3] flex">
+            <div
+              className={`${
+                isTopImage
+                  ? 'border-b-2'
+                  : isRightImage
+                    ? 'col-span-5 order-2 border-l-2'
+                    : 'col-span-5 order-1 border-r-2'
+              } border-[#171717] bg-[#F1F1D3] flex`}
+            >
               <StudioImage
                 src={service.imageUrl}
                 driveFileId={service.driveFileId}
+                cacheVersion={service.updatedAt}
                 alt={service.title}
                 accentColor={service.accentColor}
-                aspectClass="w-full aspect-[16/10] max-h-[280px] lg:aspect-auto lg:h-full lg:max-h-none"
+                aspectClass={
+                  isTopImage
+                    ? `w-full ${aspectClass} max-h-[380px]`
+                    : `w-full ${aspectClass} lg:aspect-auto lg:h-full`
+                }
                 loading="eager"
               />
             </div>
 
             {/* Contiguous Order & Pricing Module */}
-            <div className="lg:col-span-7 p-4 sm:p-5 lg:p-6 flex flex-col justify-between gap-4">
+            <div
+              className={`${
+                isTopImage ? '' : isRightImage ? 'col-span-7 order-1' : 'col-span-7 order-2'
+              } p-4 sm:p-5 lg:p-6 flex flex-col justify-between gap-4`}
+            >
               <div className="space-y-2">
                 <p className="nb-kicker">
                   {SERVICE_CATEGORY_LABELS[service.category]} · Estimasi {service.estimatedTurnaround}
@@ -114,7 +154,7 @@ export function ServiceDetailPage() {
                 </div>
                 <div className="flex items-center gap-2 p-2.5 bg-[#F8F8E1]/70 border border-[#171717]/20 rounded-[4px]">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#0F3D3A] shrink-0" />
-                  <span>Brief & lampiran privat per akun</span>
+                  <span>Brief &amp; lampiran privat per akun</span>
                 </div>
               </div>
 
@@ -139,59 +179,75 @@ export function ServiceDetailPage() {
 
         {/* Balanced Full Description & Deliverables Row */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-          <div className="lg:col-span-7 nb-card p-4 sm:p-5 space-y-2 h-full">
-            <h2 className="font-display font-bold text-base sm:text-lg text-[#171717]">
-              Deskripsi & Cakupan Layanan
-            </h2>
-            <p className="text-xs sm:text-sm text-[#333333] leading-relaxed whitespace-pre-line">
-              {service.fullDescription}
-            </p>
-          </div>
+          <FadeScroll index={0} columnsPerRow={2} className="lg:col-span-7 h-full">
+            <div className="nb-card p-4 sm:p-5 space-y-2 h-full">
+              <h2 className="font-display font-bold text-base sm:text-lg text-[#171717]">
+                Deskripsi &amp; Cakupan Layanan
+              </h2>
+              <p className="text-xs sm:text-sm text-[#333333] leading-relaxed whitespace-pre-line">
+                {service.fullDescription}
+              </p>
+            </div>
+          </FadeScroll>
 
-          <div className="lg:col-span-5 nb-card p-4 sm:p-5 space-y-2.5 h-full">
-            <h2 className="font-display font-bold text-base sm:text-lg text-[#171717]">
-              Yang Anda Dapatkan
-            </h2>
-            <ul className="space-y-2">
-              {service.deliverables.map((item, idx) => (
-                <li
-                  key={idx}
-                  className="flex items-start gap-2.5 text-xs sm:text-sm text-[#262626]"
-                >
-                  <span className="w-4 h-4 mt-0.5 shrink-0 bg-[#F3C95B] border-2 border-[#171717] flex items-center justify-center">
-                    <Check className="w-2.5 h-2.5 text-[#171717]" />
-                  </span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <FadeScroll index={1} columnsPerRow={2} className="lg:col-span-5 h-full">
+            <div className="nb-card p-4 sm:p-5 space-y-2.5 h-full">
+              <h2 className="font-display font-bold text-base sm:text-lg text-[#171717]">
+                Yang Anda Dapatkan
+              </h2>
+              <ul className="space-y-2">
+                {service.deliverables.map((item, idx) => (
+                  <li
+                    key={idx}
+                    className="flex items-start gap-2.5 text-xs sm:text-sm text-[#262626]"
+                  >
+                    <span className="w-4 h-4 mt-0.5 shrink-0 bg-[#F3C95B] border-2 border-[#171717] flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5 text-[#171717]" />
+                    </span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </FadeScroll>
         </div>
 
         {/* Photo & Video Documentation Gallery */}
-        {service.gallery && service.gallery.length > 0 && (
-          <section className="nb-card p-4 sm:p-5">
-            <MediaGallerySection
-              items={service.gallery}
-              title="Galeri Dokumentasi Layanan"
-            />
-          </section>
+        {detailCfg.showGallery && service.gallery && service.gallery.length > 0 && (
+          <FadeScroll index={0}>
+            <section className="nb-card p-4 sm:p-5">
+              <MediaGallerySection
+                items={service.gallery}
+                title="Galeri Dokumentasi Layanan"
+                cacheVersion={service.updatedAt}
+              />
+            </section>
+          </FadeScroll>
         )}
 
         {/* Related Services */}
-        {otherServices.length > 0 && (
+        {detailCfg.showRelated && otherServices.length > 0 && (
           <section className="pt-6 border-t-2 border-[#171717] space-y-4">
-            <SectionHeader
-              title="Layanan Lainnya"
-              action={
-                <Link to="/layanan" className="nb-btn nb-btn-surface nb-btn-sm">
-                  Lihat Semua
-                </Link>
-              }
-            />
-            <div className={`grid ${CATALOG_GRID_COLS_CLASS} gap-2.5 sm:gap-3 items-stretch`}>
-              {otherServices.map((item) => (
-                <ServiceCard key={item.id} service={item} />
+            <FadeScroll index={0}>
+              <SectionHeader
+                title="Layanan Lainnya"
+                action={
+                  <Link to="/layanan" className="nb-btn nb-btn-surface nb-btn-sm">
+                    Lihat Semua
+                  </Link>
+                }
+              />
+            </FadeScroll>
+            <div
+              className="grid gap-2.5 sm:gap-3 items-stretch"
+              style={{
+                gridTemplateColumns: `repeat(${relatedCols}, minmax(0, 1fr))`,
+              }}
+            >
+              {otherServices.map((item, idx) => (
+                <FadeScroll key={item.id} index={idx} columnsPerRow={relatedCols} className="h-full">
+                  <ServiceCard service={item} />
+                </FadeScroll>
               ))}
             </div>
           </section>

@@ -179,13 +179,254 @@ export function sanitizeHttpUrl(url: string | undefined | null): string {
   }
 }
 
-export function buildMediaProxyUrl(fileId: string, visibility: MediaVisibility = 'public'): string {
+export function normalizeMediaCacheVersion(version?: unknown): string {
+  if (version === null || version === undefined || version === '') return '';
+  if (typeof version === 'number') {
+    return Number.isFinite(version) && version > 0 ? String(Math.round(version)) : '';
+  }
+  if (typeof version === 'string') {
+    const trimmed = version.trim();
+    if (!trimmed) return '';
+    if (/^[a-zA-Z0-9_-]{1,32}$/.test(trimmed)) {
+      return trimmed;
+    }
+    const ms = extractTimestampMs(trimmed);
+    return ms > 0 ? String(ms) : '';
+  }
+  const ms = extractTimestampMs(version);
+  return ms > 0 ? String(ms) : '';
+}
+
+export function extractMediaCacheVersion(url?: string | null): string {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = trimmed.startsWith('/')
+      ? new URL(trimmed, 'https://syamscreativestudio.local')
+      : new URL(trimmed);
+    const v = (parsed.searchParams.get('v') || '').trim();
+    return /^[a-zA-Z0-9_-]{1,32}$/.test(v) ? v : '';
+  } catch {
+    return '';
+  }
+}
+
+export function appendMediaCacheVersion(url: string, version?: unknown): string {
+  const trimmed = (url || '').trim();
+  const ver = normalizeMediaCacheVersion(version);
+  if (!trimmed || !ver) return trimmed;
+
+  const isProxyUrl = trimmed.startsWith('/api/media/');
+  const isHttpUrl = /^https?:\/\//i.test(trimmed);
+  if (!isProxyUrl && !isHttpUrl) return trimmed;
+  if (/^https?:\/\/(?:drive|docs)\.google\.com\/file\/d\//i.test(trimmed)) return trimmed;
+
+  try {
+    if (isProxyUrl) {
+      const parsed = new URL(trimmed, 'https://syamscreativestudio.local');
+      parsed.searchParams.set('v', ver);
+      return `${parsed.pathname}${parsed.search}`.slice(0, 500);
+    }
+    const parsed = new URL(trimmed);
+    parsed.searchParams.set('v', ver);
+    return parsed.toString().slice(0, 500);
+  } catch {
+    return trimmed;
+  }
+}
+
+export function buildMediaProxyUrl(
+  fileId: string,
+  visibility: MediaVisibility = 'public',
+  cacheVersion?: unknown
+): string {
   const cleanId = fileId.trim();
   if (!/^[a-zA-Z0-9_\-]+$/.test(cleanId)) {
     return '';
   }
-  const query = visibility === 'private' ? '?visibility=private' : '';
-  return `/api/media/${encodeURIComponent(cleanId)}${query}`;
+  const params = new URLSearchParams();
+  if (visibility === 'private') {
+    params.set('visibility', 'private');
+  }
+  const ver = normalizeMediaCacheVersion(cacheVersion);
+  if (ver) {
+    params.set('v', ver);
+  }
+  const queryStr = params.toString();
+  return `/api/media/${encodeURIComponent(cleanId)}${queryStr ? `?${queryStr}` : ''}`;
+}
+
+export function extractDriveFileId(input?: string | null): string {
+  if (!input || typeof input !== 'string') return '';
+  const trimmed = input.trim();
+  if (!trimmed) return '';
+
+  // Raw Drive fileId (excluding short slug fragments unless explicitly passed)
+  if (/^[a-zA-Z0-9_\-]{10,200}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Relative or absolute proxy URL: /api/media/<fileId>?visibility=...
+  const proxyMatch = trimmed.match(/\/api\/media\/([a-zA-Z0-9_\-]{3,200})(?:[/?#]|$)/);
+  if (proxyMatch?.[1]) {
+    return proxyMatch[1];
+  }
+
+  // Google Drive / Googleusercontent links
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    if (host.includes('drive.google.com') || host.includes('docs.google.com')) {
+      const pathMatch = parsed.pathname.match(/\/(?:file\/d|d)\/([a-zA-Z0-9_\-]{3,200})/);
+      if (pathMatch?.[1]) return pathMatch[1];
+      const queryId = parsed.searchParams.get('id')?.trim() || '';
+      if (/^[a-zA-Z0-9_\-]{3,200}$/.test(queryId)) return queryId;
+    }
+    if (host.endsWith('googleusercontent.com')) {
+      const lhMatch = parsed.pathname.match(/\/d\/([a-zA-Z0-9_\-]{3,200})/);
+      if (lhMatch?.[1]) return lhMatch[1];
+    }
+  } catch {
+    // Ignore non-URL input
+  }
+
+  return '';
+}
+
+export function buildDrivePublicCdnUrl(
+  fileId: string,
+  variant: 'thumbnail' | 'lh3' = 'thumbnail'
+): string {
+  const cleanId = fileId.trim();
+  if (!/^[a-zA-Z0-9_\-]{3,200}$/.test(cleanId)) {
+    return '';
+  }
+  if (variant === 'lh3') {
+    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(cleanId)}=w1600`;
+  }
+  return `https://drive.google.com/thumbnail?id=${encodeURIComponent(cleanId)}&sz=w1600`;
+}
+
+export type MediaCandidateSource =
+  | 'proxy'
+  | 'drive_thumbnail'
+  | 'drive_lh3'
+  | 'src_fallback';
+
+export interface MediaImageCandidate {
+  url: string;
+  source: MediaCandidateSource;
+}
+
+export function buildMediaImageCandidates(params: {
+  driveFileId?: string;
+  src?: string;
+  visibility?: MediaVisibility;
+  allowSrcFallback?: boolean;
+  cacheVersion?: unknown;
+}): MediaImageCandidate[] {
+  const visibility: MediaVisibility = params.visibility === 'private' ? 'private' : 'public';
+  const allowSrcFallback = params.allowSrcFallback ?? true;
+  const effectiveVersion =
+    normalizeMediaCacheVersion(params.cacheVersion) || extractMediaCacheVersion(params.src);
+
+  const explicitDriveId = (params.driveFileId || '').trim();
+  const cleanDriveId = /^[a-zA-Z0-9_\-]{3,200}$/.test(explicitDriveId)
+    ? explicitDriveId
+    : extractDriveFileId(params.src);
+
+  const candidates: MediaImageCandidate[] = [];
+  const seenUrls = new Set<string>();
+  const addCandidate = (url: string, source: MediaCandidateSource) => {
+    if (!url || seenUrls.has(url)) return;
+    seenUrls.add(url);
+    candidates.push({ url, source });
+  };
+
+  if (cleanDriveId) {
+    addCandidate(buildMediaProxyUrl(cleanDriveId, visibility, effectiveVersion), 'proxy');
+    if (visibility === 'public') {
+      addCandidate(buildDrivePublicCdnUrl(cleanDriveId, 'thumbnail'), 'drive_thumbnail');
+      addCandidate(buildDrivePublicCdnUrl(cleanDriveId, 'lh3'), 'drive_lh3');
+    }
+  }
+
+  const safeSrc = sanitizeExternalUrl(params.src);
+  const isDriveHtmlViewer = /^https?:\/\/(?:drive|docs)\.google\.com\/file\/d\//i.test(safeSrc);
+  const isSameDriveProxy =
+    Boolean(cleanDriveId) && extractDriveFileId(safeSrc) === cleanDriveId && safeSrc.includes('/api/media/');
+
+  if (safeSrc && allowSrcFallback && !isDriveHtmlViewer && !isSameDriveProxy) {
+    const versionedSrc = effectiveVersion
+      ? appendMediaCacheVersion(safeSrc, effectiveVersion)
+      : safeSrc;
+    addCandidate(versionedSrc, 'src_fallback');
+  }
+
+  return candidates;
+}
+
+export type MediaFailureSource =
+  | 'google_drive_api'
+  | 'netlify_function'
+  | 'firestore_metadata'
+  | 'file_permissions'
+  | 'image_url'
+  | 'frontend_render';
+
+export function classifyMediaHttpFailure(params: {
+  status?: number;
+  contentType?: string;
+  url?: string;
+}): { source: MediaFailureSource; summary: string } {
+  const status = params.status ?? 0;
+  const contentType = (params.contentType || '').toLowerCase();
+
+  if (status === 401 || status === 403) {
+    return {
+      source: 'file_permissions',
+      summary: `Akses ditolak (${status}). Periksa izin file Google Drive (Anyone with link) atau token autentikasi.`,
+    };
+  }
+  if (status === 404) {
+    return {
+      source: 'google_drive_api',
+      summary: 'File tidak ditemukan di Google Drive (404) atau endpoint proxy tidak terjangkau.',
+    };
+  }
+  if (status === 502 || status === 503 || status === 504 || status === 507) {
+    return {
+      source: 'google_drive_api',
+      summary: `Server proxy/Google Drive API gagal merespons (${status}). Periksa env GOOGLE_DRIVE_* atau kuota API.`,
+    };
+  }
+  if (status === 200 && contentType.includes('text/html')) {
+    return {
+      source: 'netlify_function',
+      summary:
+        'Endpoint /api/media/ mengembalikan HTML (SPA fallback), bukan biner gambar — fungsi Netlify belum ter-route atau gagal.',
+    };
+  }
+  if (status === 400) {
+    return {
+      source: 'image_url',
+      summary: 'Format fileId atau URL media tidak valid (400).',
+    };
+  }
+  if (params.url && !params.url.startsWith('/') && !params.url.startsWith('https://')) {
+    return {
+      source: 'image_url',
+      summary: 'Skema URL media tidak didukung browser.',
+    };
+  }
+  return {
+    source: 'frontend_render',
+    summary:
+      status > 0
+        ? `Gagal memuat media (HTTP ${status}, ${contentType || 'unknown'}).`
+        : 'Gambar gagal dimuat oleh browser atau diblokir jaringan/CORS.',
+  };
 }
 
 export function slugify(input: string): string {
@@ -669,6 +910,63 @@ export function validateServiceInput(input: ServiceValidationInput): ValidationR
   };
 }
 
+export interface PortfolioValidationInput {
+  title: string;
+  clientName: string;
+  category: ServiceCategory;
+  year: string;
+  summary: string;
+  outcome: string;
+  metrics: string;
+  imageUrl: string;
+  projectUrl?: string;
+}
+
+export function validatePortfolioInput(input: PortfolioValidationInput): ValidationResult {
+  const errors: Record<string, string> = {};
+  const cleanTitle = (input.title || '').trim();
+  const cleanClient = (input.clientName || '').trim();
+  const cleanYear = (input.year || '').trim();
+  const cleanSummary = (input.summary || '').trim();
+  const cleanOutcome = (input.outcome || '').trim();
+  const cleanMetrics = (input.metrics || '').trim();
+  const cleanImage = sanitizeExternalUrl(input.imageUrl);
+  const rawProjectUrl = (input.projectUrl || '').trim();
+
+  if (cleanTitle.length < 3 || cleanTitle.length > 140) {
+    errors.title = 'Judul proyek wajib 3–140 karakter.';
+  }
+  if (cleanClient.length < 2 || cleanClient.length > 100) {
+    errors.clientName = 'Nama klien wajib 2–100 karakter.';
+  }
+  if (!VALID_SERVICE_CATEGORIES.includes(input.category)) {
+    errors.category = 'Pilih kategori portofolio yang valid.';
+  }
+  if (cleanYear.length < 4 || cleanYear.length > 10) {
+    errors.year = 'Tahun proyek wajib 4–10 karakter (contoh: 2026).';
+  }
+  if (cleanSummary.length < 10 || cleanSummary.length > 350) {
+    errors.summary = 'Ringkasan singkat wajib 10–350 karakter.';
+  }
+  if (cleanOutcome.length < 5 || cleanOutcome.length > 1200) {
+    errors.outcome = 'Solusi & hasil wajib 5–1200 karakter.';
+  }
+  if (cleanMetrics.length < 2 || cleanMetrics.length > 120) {
+    errors.metrics = 'Dampak terukur wajib 2–120 karakter.';
+  }
+  if (!cleanImage) {
+    errors.imageUrl = 'Pilih atau unggah thumbnail utama portofolio terlebih dahulu.';
+  }
+  if (rawProjectUrl && !sanitizeExternalUrl(rawProjectUrl)) {
+    errors.projectUrl = 'Tautan proyek harus diawali https:// atau http:// yang valid.';
+  }
+
+  return {
+    valid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
 export const MEDIA_USAGE_LABELS: Record<MediaUsage, string> = {
   product: 'Produk Digital',
   service: 'Layanan',
@@ -873,6 +1171,26 @@ export function findMediaUsages(
   }
 
   return refs;
+}
+
+export function isPublicPublishedMediaAsset(asset: {
+  visibility: MediaVisibility;
+  isPublished?: boolean;
+}): boolean {
+  return asset.visibility === 'public' && asset.isPublished !== false;
+}
+
+export function canDeleteMediaAsset(usages: MediaUsageReference[]): {
+  allowed: boolean;
+  reason?: string;
+} {
+  if (!usages || usages.length === 0) {
+    return { allowed: true };
+  }
+  return {
+    allowed: false,
+    reason: `Berkas media tidak dapat dihapus permanen karena masih digunakan oleh ${usages.length} konten aktif. Ganti atau lepas gambar pada konten terkait terlebih dahulu.`,
+  };
 }
 
 export function reorderGalleryItems(

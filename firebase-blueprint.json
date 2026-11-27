@@ -797,7 +797,7 @@
         },
         "entityType": {
           "type": "string",
-          "enum": ["order", "service", "product", "portfolio", "media", "faq", "site_settings", "admin", "contact"]
+          "enum": ["order", "service", "product", "portfolio", "media", "faq", "site_settings", "site_design", "admin", "contact"]
         },
         "entityId": {
           "type": "string",
@@ -862,6 +862,78 @@
         }
       },
       "required": ["name", "email", "subject", "message", "status", "createdAt"]
+    },
+    "SiteDesign": {
+      "title": "SiteDesign",
+      "description": "Konfigurasi Global Website Design Customization Dashboard (dipisah antara dokumen published, draft, dan previous).",
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["published", "draft", "previous"]
+        },
+        "global": {
+          "type": "object"
+        },
+        "identity": {
+          "type": "object"
+        },
+        "header": {
+          "type": "object"
+        },
+        "footer": {
+          "type": "object"
+        },
+        "home": {
+          "type": "object"
+        },
+        "products": {
+          "type": "object"
+        },
+        "services": {
+          "type": "object"
+        },
+        "portfolio": {
+          "type": "object"
+        },
+        "articles": {
+          "type": "object"
+        },
+        "otherPages": {
+          "type": "object"
+        },
+        "responsive": {
+          "type": "object"
+        },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "status",
+        "global",
+        "identity",
+        "header",
+        "footer",
+        "home",
+        "products",
+        "services",
+        "portfolio",
+        "articles",
+        "otherPages",
+        "responsive",
+        "updatedBy",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -900,6 +972,10 @@
     "/site_settings/{settingId}": {
       "schema": { "$ref": "#/entities/SiteSettings" },
       "description": "Pengaturan konten utama, kontak, dan media sosial studio."
+    },
+    "/site_design/{designId}": {
+      "schema": { "$ref": "#/entities/SiteDesign" },
+      "description": "Konfigurasi desain visual global (published untuk publik, draft & previous khusus admin)."
     },
     "/faqs/{faqId}": {
       "schema": { "$ref": "#/entities/FaqItem" },

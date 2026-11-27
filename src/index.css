@@ -657,83 +657,37 @@ html[data-theme="clean_bento"] .bg-\[\#171717\]\/80 {
 }
 
 /* ============================================================================
-   Velocity Scroll & Overlapping Section Animation Layer
-   Theme-calibrated for both Neo Brutalist and Clean Bento Grid.
+   Fade Scrolling System
+   Global, theme-agnostic entrance reveal (opacity + translateY) with
+   prefers-reduced-motion support and zero-JS visible fallback.
    ============================================================================ */
 
-.scs-velocity-layer {
-  will-change: transform;
-  transform-origin: center center;
+.scs-fade-item {
+  opacity: 1;
+  transform: none;
 }
 
-.scs-overlap-section {
-  overflow-x: clip;
-  isolation: isolate;
+.scs-fade-item[data-fade-state="hidden"] {
+  opacity: 0;
+  transform: translate3d(0, var(--scs-fade-distance, 26px), 0);
+  will-change: opacity, transform;
 }
 
-/* Keep Section 5 (Keunggulan) visually identical in Neo Brutalist while 100% opaque for clean overlap */
-.scs-overlap-section.bg-\[\#8ACCD5\]\/20 {
-  background-color: #E2EFDF;
+.scs-fade-item[data-fade-state="visible"] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition-property: opacity, transform;
+  transition-duration: var(--scs-fade-duration, 700ms);
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--scs-fade-delay, 0ms);
 }
 
-.scs-overlap-inner {
-  will-change: transform;
-  transform-origin: center top;
+.scs-fade-item[data-fade-state="visible"][data-fade-settled="true"] {
+  transform: none;
+  will-change: auto;
 }
 
-.scs-overlap-shade {
-  background: linear-gradient(
-    to bottom,
-    rgba(23, 23, 23, 0.22) 0%,
-    rgba(15, 61, 58, 0.48) 100%
-  );
-  transition: opacity 70ms linear;
-  z-index: 2;
-}
-
-/* Neo Brutalist rising section curtain: bold 3px ink top plate + crisp architectural lift */
-.scs-overlap-curtain {
-  border-top: 3px solid #171717;
-  margin-top: -2px;
-  box-shadow:
-    0 -6px 0 0 rgba(23, 23, 23, 0.14),
-    0 -22px 44px -8px rgba(23, 23, 23, 0.32);
-}
-
-/* Clean Bento Grid rising section curtain: unmistakable 28px rounded stacked deck elevation */
-html[data-theme="clean_bento"] .scs-overlap-curtain {
-  border-top: 1px solid rgba(15, 61, 58, 0.12);
-  margin-top: 0;
-  border-top-left-radius: 28px;
-  border-top-right-radius: 28px;
-  box-shadow:
-    0 -24px 56px -10px rgba(15, 61, 58, 0.26),
-    0 -4px 12px -2px rgba(15, 61, 58, 0.08);
-}
-
-html[data-theme="clean_bento"] .scs-overlap-curtain::before {
-  content: '';
-  position: absolute;
-  top: 9px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 44px;
-  height: 4px;
-  border-radius: 9999px;
-  background-color: rgba(15, 61, 58, 0.14);
-  pointer-events: none;
-  z-index: 5;
-}
-
-html[data-theme="clean_bento"] .scs-overlap-shade {
-  background: linear-gradient(
-    to bottom,
-    rgba(15, 61, 58, 0.16) 0%,
-    rgba(15, 61, 58, 0.42) 100%
-  );
-}
-
-/* Theme-aware purely decorative parallax depth accents */
+/* Theme-aware decorative accent squares */
 .scs-deco-accent {
   pointer-events: none;
   user-select: none;
@@ -752,20 +706,13 @@ html[data-theme="clean_bento"] .scs-deco-accent {
     scroll-behavior: auto;
   }
 
-  .scs-velocity-layer,
-  .scs-overlap-inner {
+  .scs-fade-item,
+  .scs-fade-item[data-fade-state="hidden"],
+  .scs-fade-item[data-fade-state="visible"] {
+    opacity: 1 !important;
     transform: none !important;
-    border-radius: 0 !important;
+    transition: none !important;
     will-change: auto !important;
-  }
-
-  .scs-overlap-section {
-    position: relative !important;
-    top: auto !important;
-  }
-
-  .scs-overlap-shade {
-    opacity: 0 !important;
   }
 
   *,
@@ -776,3 +723,82 @@ html[data-theme="clean_bento"] .scs-deco-accent {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================================
+   Global Website Design Studio — Configurable Card Hover & Preview Scoping
+   ============================================================================ */
+.scs-hover-none:hover {
+  transform: none !important;
+}
+
+.scs-hover-lift {
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease;
+}
+.scs-hover-lift:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 12px 24px -10px rgba(15, 61, 58, 0.24) !important;
+}
+
+.scs-hover-scale {
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.scs-hover-scale:hover {
+  transform: scale(1.02) !important;
+}
+
+.scs-hover-border {
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.scs-hover-border:hover {
+  transform: none !important;
+  border-color: #0F3D3A !important;
+  box-shadow: 0 0 0 2px rgba(15, 61, 58, 0.25) !important;
+}
+
+/* Scoped theme preview support inside Website Design Studio Live Preview canvas */
+.scs-preview-canvas[data-preview-theme="clean_bento"] {
+  background-color: #F4F5F1;
+  color: #181C1B;
+}
+
+.scs-preview-canvas[data-preview-theme="clean_bento"] .nb-card,
+.scs-preview-canvas[data-preview-theme="clean_bento"] .nb-card-cream,
+.scs-preview-canvas[data-preview-theme="clean_bento"] .nb-card-interactive {
+  border-width: 1px;
+  border-color: rgba(15, 61, 58, 0.11);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 61, 58, 0.04), 0 8px 22px -12px rgba(15, 61, 58, 0.11);
+}
+
+.scs-preview-canvas[data-preview-theme="clean_bento"] .nb-btn {
+  border-width: 1px;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(15, 61, 58, 0.06);
+}
+
+.scs-preview-canvas[data-preview-theme="clean_bento"] .nb-tab {
+  border-width: 1px;
+  border-radius: 9px;
+}
+
+.scs-preview-canvas[data-preview-theme="neo_brutalist"] {
+  background-color: #F8F8E1;
+  color: #171717;
+}
+
+.scs-preview-canvas[data-preview-theme="neo_brutalist"] .nb-card,
+.scs-preview-canvas[data-preview-theme="neo_brutalist"] .nb-card-cream,
+.scs-preview-canvas[data-preview-theme="neo_brutalist"] .nb-card-interactive {
+  border-width: 2px;
+  border-color: #171717;
+  border-radius: 4px;
+  box-shadow: 3px 3px 0px #171717;
+}
+
+.scs-preview-canvas[data-preview-theme="neo_brutalist"] .nb-btn {
+  border-width: 2px;
+  border-color: #171717;
+  border-radius: 4px;
+  box-shadow: 2px 2px 0px #171717;
+}
+

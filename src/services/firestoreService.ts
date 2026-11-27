@@ -28,6 +28,7 @@ import {
 } from '../data/initialCatalog';
 import { INITIAL_DIGITAL_PRODUCTS, PRODUCT_IMAGES } from '../data/digitalProducts';
 import {
+  appendMediaCacheVersion,
   formatServicePriceLabel,
   normalizeVisualTheme,
   normalizeWhatsappNumber,
@@ -52,6 +53,11 @@ import type {
   SiteSettings,
   VisualThemeMode,
 } from '../types/studio';
+import type { SiteDesignConfig } from '../types/design';
+import {
+  mergeSiteDesignConfig,
+  sanitizeSiteDesignForFirestore,
+} from '../utils/designSystem';
 import type { MediaUsageReference } from '../utils/studioLogic';
 
 function randomDocId(prefix: string): string {
@@ -863,9 +869,7 @@ export async function savePortfolioByAdmin(
     if (item.challenge && item.challenge.trim()) {
       payload.challenge = item.challenge.trim().slice(0, 1200);
     }
-    if (item.driveFileId && item.driveFileId.trim()) {
-      payload.driveFileId = item.driveFileId.trim().slice(0, 200);
-    }
+    payload.driveFileId = (item.driveFileId || '').trim().slice(0, 200);
     if (Array.isArray(item.gallery)) {
       payload.gallery = sanitizeGalleryItems(item.gallery);
     }
@@ -1259,6 +1263,116 @@ export async function deleteMediaAndCleanupReferences(params: {
   }
 }
 
+export async function syncReplacedMediaVersionAcrossReferences(params: {
+  fileId: string;
+  versionTs: number;
+  usages: MediaUsageReference[];
+  products: DigitalProductItem[];
+  services: ServiceItem[];
+  portfolio: PortfolioItem[];
+  siteSettings: SiteSettings | null;
+}): Promise<number> {
+  if (!params.fileId || !params.usages || params.usages.length === 0) return 0;
+  try {
+    const batch = writeBatch(db);
+    const updatedProductIds = new Set<string>();
+    const updatedServiceIds = new Set<string>();
+    const updatedPortfolioIds = new Set<string>();
+    let updatedSiteSettings = false;
+    let updatedCount = 0;
+    const proxyFragment = `/api/media/${encodeURIComponent(params.fileId)}`;
+
+    for (const ref of params.usages) {
+      if (ref.entityType === 'product' && !updatedProductIds.has(ref.entityId)) {
+        updatedProductIds.add(ref.entityId);
+        const prod = params.products.find((p) => p.id === ref.entityId);
+        if (prod) {
+          const isPrimary =
+            prod.driveFileId === params.fileId || prod.imageUrl?.includes(proxyFragment);
+          const nextImageUrl = isPrimary
+            ? appendMediaCacheVersion(prod.imageUrl || proxyFragment, params.versionTs)
+            : prod.imageUrl;
+          const nextGallery = (prod.gallery || []).map((g) =>
+            g.fileId === params.fileId
+              ? { ...g, imageUrl: appendMediaCacheVersion(g.imageUrl || proxyFragment, params.versionTs) }
+              : g
+          );
+          batch.update(doc(db, 'digital_products', prod.id), {
+            imageUrl: nextImageUrl,
+            gallery: sanitizeGalleryItems(nextGallery),
+            updatedAt: serverTimestamp(),
+          });
+          updatedCount += 1;
+        }
+      } else if (ref.entityType === 'service' && !updatedServiceIds.has(ref.entityId)) {
+        updatedServiceIds.add(ref.entityId);
+        const srv = params.services.find((s) => s.id === ref.entityId);
+        if (srv) {
+          const isPrimary =
+            srv.driveFileId === params.fileId || srv.imageUrl?.includes(proxyFragment);
+          const nextImageUrl = isPrimary
+            ? appendMediaCacheVersion(srv.imageUrl || proxyFragment, params.versionTs)
+            : srv.imageUrl;
+          const nextGallery = (srv.gallery || []).map((g) =>
+            g.fileId === params.fileId
+              ? { ...g, imageUrl: appendMediaCacheVersion(g.imageUrl || proxyFragment, params.versionTs) }
+              : g
+          );
+          batch.update(doc(db, 'services', srv.id), {
+            imageUrl: nextImageUrl,
+            gallery: sanitizeGalleryItems(nextGallery),
+            updatedAt: serverTimestamp(),
+          });
+          updatedCount += 1;
+        }
+      } else if (ref.entityType === 'portfolio' && !updatedPortfolioIds.has(ref.entityId)) {
+        updatedPortfolioIds.add(ref.entityId);
+        const work = params.portfolio.find((w) => w.id === ref.entityId);
+        if (work) {
+          const isPrimary =
+            work.driveFileId === params.fileId || work.imageUrl?.includes(proxyFragment);
+          const nextImageUrl = isPrimary
+            ? appendMediaCacheVersion(work.imageUrl || proxyFragment, params.versionTs)
+            : work.imageUrl;
+          const nextGallery = (work.gallery || []).map((g) =>
+            g.fileId === params.fileId
+              ? { ...g, imageUrl: appendMediaCacheVersion(g.imageUrl || proxyFragment, params.versionTs) }
+              : g
+          );
+          batch.update(doc(db, 'portfolio', work.id), {
+            imageUrl: nextImageUrl,
+            gallery: sanitizeGalleryItems(nextGallery),
+            updatedAt: serverTimestamp(),
+          });
+          updatedCount += 1;
+        }
+      } else if (
+        ref.entityType === 'site_settings' &&
+        params.siteSettings &&
+        !updatedSiteSettings
+      ) {
+        updatedSiteSettings = true;
+        const nextHeroUrl = appendMediaCacheVersion(
+          params.siteSettings.heroImageUrl || proxyFragment,
+          params.versionTs
+        );
+        batch.update(doc(db, 'site_settings', 'general'), {
+          heroImageUrl: nextHeroUrl,
+          updatedAt: serverTimestamp(),
+        });
+        updatedCount += 1;
+      }
+    }
+
+    if (updatedCount > 0) {
+      await batch.commit();
+    }
+    return updatedCount;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'sync_media_version');
+  }
+}
+
 export async function saveSiteSettingsByAdmin(
   settings: SiteSettings,
   actor: { uid: string; email: string }
@@ -1538,3 +1652,163 @@ export async function seedInitialStudioData(actor: { uid: string; email: string 
     handleFirestoreError(error, OperationType.WRITE, 'seed_initial_data');
   }
 }
+
+// -----------------------------------------------------------------------------
+// Global Website Design Studio (site_design: published / draft / previous)
+// -----------------------------------------------------------------------------
+
+export function subscribePublishedSiteDesign(
+  onData: (config: SiteDesignConfig | null) => void,
+  onError: (err: unknown) => void
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, 'site_design', 'published'),
+    (snap) => {
+      if (!snap.exists()) {
+        onData(null);
+        return;
+      }
+      onData(mergeSiteDesignConfig(snap.data(), 'published'));
+    },
+    (error) => {
+      onError(error);
+    }
+  );
+}
+
+export async function fetchAdminSiteDesignDocs(): Promise<{
+  published: SiteDesignConfig | null;
+  draft: SiteDesignConfig | null;
+  previous: SiteDesignConfig | null;
+}> {
+  const path = 'site_design';
+  try {
+    const [pubSnap, draftSnap, prevSnap] = await Promise.all([
+      getDoc(doc(db, 'site_design', 'published')),
+      getDoc(doc(db, 'site_design', 'draft')),
+      getDoc(doc(db, 'site_design', 'previous')),
+    ]);
+    return {
+      published: pubSnap.exists() ? mergeSiteDesignConfig(pubSnap.data(), 'published') : null,
+      draft: draftSnap.exists() ? mergeSiteDesignConfig(draftSnap.data(), 'draft') : null,
+      previous: prevSnap.exists() ? mergeSiteDesignConfig(prevSnap.data(), 'previous') : null,
+    };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+  }
+}
+
+export async function saveSiteDesignDraftByAdmin(
+  config: SiteDesignConfig,
+  actor: { uid: string; email: string }
+): Promise<SiteDesignConfig> {
+  const path = 'site_design/draft';
+  try {
+    const payload = sanitizeSiteDesignForFirestore(config, 'draft', actor.email || actor.uid);
+    await setDoc(doc(db, 'site_design', 'draft'), {
+      ...payload,
+      updatedAt: serverTimestamp(),
+    });
+    await logAdminActivity({
+      actorUid: actor.uid,
+      actorEmail: actor.email,
+      action: 'SAVE_DESIGN_DRAFT',
+      entityType: 'site_design',
+      entityId: 'draft',
+      summary: 'Menyimpan rancangan (draft) konfigurasi desain website tanpa mengubah tampilan publik.',
+    });
+    return mergeSiteDesignConfig(payload, 'draft');
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function publishSiteDesignByAdmin(
+  config: SiteDesignConfig,
+  actor: { uid: string; email: string }
+): Promise<{ published: SiteDesignConfig; hasPrevious: boolean }> {
+  const path = 'site_design/published';
+  try {
+    const existingPubSnap = await getDoc(doc(db, 'site_design', 'published'));
+    const batch = writeBatch(db);
+    let hasPrevious = false;
+
+    if (existingPubSnap.exists()) {
+      const prevConfig = mergeSiteDesignConfig(existingPubSnap.data(), 'previous');
+      const prevPayload = sanitizeSiteDesignForFirestore(
+        prevConfig,
+        'previous',
+        actor.email || actor.uid
+      );
+      batch.set(doc(db, 'site_design', 'previous'), {
+        ...prevPayload,
+        updatedAt: serverTimestamp(),
+      });
+      hasPrevious = true;
+    }
+
+    const publishedPayload = sanitizeSiteDesignForFirestore(
+      config,
+      'published',
+      actor.email || actor.uid
+    );
+    const draftPayload = sanitizeSiteDesignForFirestore(
+      config,
+      'draft',
+      actor.email || actor.uid
+    );
+
+    batch.set(doc(db, 'site_design', 'published'), {
+      ...publishedPayload,
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, 'site_design', 'draft'), {
+      ...draftPayload,
+      updatedAt: serverTimestamp(),
+    });
+
+    await batch.commit();
+
+    // Synchronize visualTheme with site_settings/general so both systems stay unified
+    const normalizedTheme = normalizeVisualTheme(config.global.visualTheme);
+    try {
+      const settingsRef = doc(db, 'site_settings', 'general');
+      const settingsSnap = await getDoc(settingsRef);
+      if (settingsSnap.exists()) {
+        if (settingsSnap.data()?.visualTheme !== normalizedTheme) {
+          await updateDoc(settingsRef, {
+            visualTheme: normalizedTheme,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } else {
+        const { id: _id, ...defaults } = INITIAL_SITE_SETTINGS;
+        await setDoc(settingsRef, {
+          ...defaults,
+          visualTheme: normalizedTheme,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    } catch {
+      // Non-blocking if settings already synced
+    }
+
+    const themeLabel = normalizedTheme === 'clean_bento' ? 'Clean Bento Grid' : 'Neo Brutalist';
+    await logAdminActivity({
+      actorUid: actor.uid,
+      actorEmail: actor.email,
+      action: 'PUBLISH_SITE_DESIGN',
+      entityType: 'site_design',
+      entityId: 'published',
+      summary: `Mempublikasikan konfigurasi desain website global (Tema: ${themeLabel}).`,
+    });
+
+    return {
+      published: mergeSiteDesignConfig(publishedPayload, 'published'),
+      hasPrevious,
+    };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+

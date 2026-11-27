@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Check, Mail } from 'lucide-react';
 import {
   saveSiteSettingsByAdmin,
@@ -38,10 +38,24 @@ export function AdminSettingsPanel({
   const [form, setForm] = useState<SiteSettings>(settings);
   const [socialErrors, setSocialErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const hasPendingEditsRef = useRef(false);
+
+  const updateForm = (updater: (prev: SiteSettings) => SiteSettings) => {
+    hasPendingEditsRef.current = true;
+    setForm(updater);
+  };
 
   useEffect(() => {
-    setForm(settings);
-    setSocialErrors({});
+    if (!hasPendingEditsRef.current) {
+      setForm(settings);
+      setSocialErrors({});
+    } else {
+      // Preserve unsaved form edits (like a freshly uploaded hero banner), while syncing theme updates
+      setForm((prev) => ({
+        ...prev,
+        visualTheme: settings.visualTheme,
+      }));
+    }
   }, [settings]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -67,6 +81,7 @@ export function AdminSettingsPanel({
     setSaving(true);
     try {
       await saveSiteSettingsByAdmin(form, actor);
+      hasPendingEditsRef.current = false;
       await onRefresh();
       onToast({
         type: 'success',
@@ -128,7 +143,7 @@ export function AdminSettingsPanel({
               id="set-name"
               type="text"
               value={form.studioName}
-              onChange={(e) => setForm((f) => ({ ...f, studioName: e.target.value }))}
+              onChange={(e) => updateForm((f) => ({ ...f, studioName: e.target.value }))}
               className="nb-input text-sm"
               required
             />
@@ -141,7 +156,7 @@ export function AdminSettingsPanel({
               id="set-slogan"
               type="text"
               value={form.slogan}
-              onChange={(e) => setForm((f) => ({ ...f, slogan: e.target.value }))}
+              onChange={(e) => updateForm((f) => ({ ...f, slogan: e.target.value }))}
               className="nb-input text-sm"
               required
             />
@@ -156,7 +171,7 @@ export function AdminSettingsPanel({
             id="set-headline"
             type="text"
             value={form.heroHeadline}
-            onChange={(e) => setForm((f) => ({ ...f, heroHeadline: e.target.value }))}
+            onChange={(e) => updateForm((f) => ({ ...f, heroHeadline: e.target.value }))}
             className="nb-input text-sm"
             required
           />
@@ -170,22 +185,35 @@ export function AdminSettingsPanel({
             id="set-sub"
             rows={2}
             value={form.heroSubheadline}
-            onChange={(e) => setForm((f) => ({ ...f, heroSubheadline: e.target.value }))}
+            onChange={(e) => updateForm((f) => ({ ...f, heroSubheadline: e.target.value }))}
             className="nb-input text-sm"
             required
           />
         </div>
 
         <AdminImagePicker
-          label="Banner Utama Beranda (Folder: Banner Website)"
-          imageUrl={form.heroImageUrl || STUDIO_IMAGES.hero}
+          label="Banner Utama Beranda & Halaman Studio (Folder: Banner Website)"
+          imageUrl={form.heroImageUrl || ''}
           driveFileId={form.heroDriveFileId || ''}
+          savedImageUrl={settings.heroImageUrl || ''}
+          savedDriveFileId={settings.heroDriveFileId || ''}
+          entityKey="site-settings-hero"
+          allowEmpty
+          emptyHint="Jika dikosongkan, halaman Beranda dan Tentang Kami otomatis menampilkan banner bawaan studio."
+          onRestoreDefault={() =>
+            updateForm((f) => ({
+              ...f,
+              heroImageUrl: STUDIO_IMAGES.hero,
+              heroDriveFileId: '',
+            }))
+          }
+          restoreDefaultLabel="Pakai Banner Bawaan"
           usage="hero"
           media={media}
           driveFolders={driveFolders}
           actor={actor}
           onChange={({ imageUrl, driveFileId }) =>
-            setForm((f) => ({ ...f, heroImageUrl: imageUrl, heroDriveFileId: driveFileId }))
+            updateForm((f) => ({ ...f, heroImageUrl: imageUrl, heroDriveFileId: driveFileId }))
           }
           onMediaUploaded={onRefresh}
           onToast={onToast}
@@ -200,7 +228,7 @@ export function AdminSettingsPanel({
               id="set-about"
               rows={3}
               value={form.aboutSummary}
-              onChange={(e) => setForm((f) => ({ ...f, aboutSummary: e.target.value }))}
+              onChange={(e) => updateForm((f) => ({ ...f, aboutSummary: e.target.value }))}
               className="nb-input text-sm"
               required
             />
@@ -213,7 +241,7 @@ export function AdminSettingsPanel({
               id="set-mission"
               rows={3}
               value={form.aboutMission || ''}
-              onChange={(e) => setForm((f) => ({ ...f, aboutMission: e.target.value }))}
+              onChange={(e) => updateForm((f) => ({ ...f, aboutMission: e.target.value }))}
               className="nb-input text-sm"
             />
           </div>
@@ -228,7 +256,7 @@ export function AdminSettingsPanel({
               id="set-wa"
               type="text"
               value={form.whatsappNumber}
-              onChange={(e) => setForm((f) => ({ ...f, whatsappNumber: e.target.value }))}
+              onChange={(e) => updateForm((f) => ({ ...f, whatsappNumber: e.target.value }))}
               className="nb-input font-mono text-sm"
               required
             />
@@ -241,7 +269,7 @@ export function AdminSettingsPanel({
               id="set-email"
               type="email"
               value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              onChange={(e) => updateForm((f) => ({ ...f, email: e.target.value }))}
               className="nb-input text-sm"
               required
             />
@@ -254,7 +282,7 @@ export function AdminSettingsPanel({
               id="set-hours"
               type="text"
               value={form.operatingHours}
-              onChange={(e) => setForm((f) => ({ ...f, operatingHours: e.target.value }))}
+              onChange={(e) => updateForm((f) => ({ ...f, operatingHours: e.target.value }))}
               className="nb-input text-sm"
               required
             />
@@ -267,7 +295,7 @@ export function AdminSettingsPanel({
               id="set-addr"
               type="text"
               value={form.address}
-              onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+              onChange={(e) => updateForm((f) => ({ ...f, address: e.target.value }))}
               className="nb-input text-sm"
               required
             />
@@ -293,7 +321,7 @@ export function AdminSettingsPanel({
                 inputMode="url"
                 value={form.instagramUrl || ''}
                 onChange={(e) => {
-                  setForm((f) => ({ ...f, instagramUrl: e.target.value }));
+                  updateForm((f) => ({ ...f, instagramUrl: e.target.value }));
                   if (socialErrors.instagramUrl) {
                     setSocialErrors((prev) => ({ ...prev, instagramUrl: '' }));
                   }
@@ -315,7 +343,7 @@ export function AdminSettingsPanel({
                 inputMode="url"
                 value={form.tiktokUrl || ''}
                 onChange={(e) => {
-                  setForm((f) => ({ ...f, tiktokUrl: e.target.value }));
+                  updateForm((f) => ({ ...f, tiktokUrl: e.target.value }));
                   if (socialErrors.tiktokUrl) {
                     setSocialErrors((prev) => ({ ...prev, tiktokUrl: '' }));
                   }
@@ -337,7 +365,7 @@ export function AdminSettingsPanel({
                 inputMode="url"
                 value={form.youtubeUrl || ''}
                 onChange={(e) => {
-                  setForm((f) => ({ ...f, youtubeUrl: e.target.value }));
+                  updateForm((f) => ({ ...f, youtubeUrl: e.target.value }));
                   if (socialErrors.youtubeUrl) {
                     setSocialErrors((prev) => ({ ...prev, youtubeUrl: '' }));
                   }
@@ -359,7 +387,7 @@ export function AdminSettingsPanel({
                 inputMode="url"
                 value={form.linkedinUrl || ''}
                 onChange={(e) => {
-                  setForm((f) => ({ ...f, linkedinUrl: e.target.value }));
+                  updateForm((f) => ({ ...f, linkedinUrl: e.target.value }));
                   if (socialErrors.linkedinUrl) {
                     setSocialErrors((prev) => ({ ...prev, linkedinUrl: '' }));
                   }

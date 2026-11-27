@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  AlertTriangle,
   ExternalLink,
   Eye,
   EyeOff,
@@ -86,7 +87,17 @@ export function AdminServicesPanel({
 }: AdminServicesPanelProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [savedBaseline, setSavedBaseline] = useState<{
+    imageUrl: string;
+    driveFileId: string;
+    gallery: MediaGalleryItem[];
+  }>({
+    imageUrl: EMPTY_FORM.imageUrl,
+    driveFileId: '',
+    gallery: [],
+  });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [failedThumbs, setFailedThumbs] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ServiceItem | null>(null);
@@ -99,6 +110,11 @@ export function AdminServicesPanel({
   useEffect(() => {
     if (autoOpenCreate) {
       setForm({ ...EMPTY_FORM, sortOrder: services.length + 1 });
+      setSavedBaseline({
+        imageUrl: EMPTY_FORM.imageUrl,
+        driveFileId: '',
+        gallery: [],
+      });
       setFormErrors({});
       setFormOpen(true);
       onConsumeAutoOpen?.();
@@ -123,6 +139,11 @@ export function AdminServicesPanel({
 
   function openNew() {
     setForm({ ...EMPTY_FORM, sortOrder: services.length + 1 });
+    setSavedBaseline({
+      imageUrl: EMPTY_FORM.imageUrl,
+      driveFileId: '',
+      gallery: [],
+    });
     setFormErrors({});
     setFormOpen(true);
   }
@@ -148,6 +169,11 @@ export function AdminServicesPanel({
       sortOrder: srv.sortOrder,
       isFeatured: srv.isFeatured,
       isPublished: srv.isPublished,
+    });
+    setSavedBaseline({
+      imageUrl: srv.imageUrl,
+      driveFileId: srv.driveFileId || '',
+      gallery: srv.gallery || [],
     });
     setFormErrors({});
     setFormOpen(true);
@@ -532,6 +558,11 @@ export function AdminServicesPanel({
           <AdminImagePicker
             imageUrl={form.imageUrl}
             driveFileId={form.driveFileId}
+            savedImageUrl={savedBaseline.imageUrl}
+            savedDriveFileId={savedBaseline.driveFileId}
+            savedGallery={savedBaseline.gallery}
+            entityKey={form.id || 'new-service'}
+            entityPublished={form.isPublished}
             usage="service"
             media={media}
             driveFolders={driveFolders}
@@ -540,12 +571,18 @@ export function AdminServicesPanel({
             gallery={form.gallery}
             onGalleryChange={(gallery) => setForm((f) => ({ ...f, gallery }))}
             actor={actor}
-            onChange={({ imageUrl, driveFileId }) =>
-              setForm((f) => ({ ...f, imageUrl, driveFileId }))
-            }
+            onChange={({ imageUrl, driveFileId }) => {
+              setForm((f) => ({ ...f, imageUrl, driveFileId }));
+              if (formErrors.imageUrl) {
+                setFormErrors((prev) => ({ ...prev, imageUrl: '' }));
+              }
+            }}
             onMediaUploaded={onRefresh}
             onToast={onToast}
           />
+          {formErrors.imageUrl && (
+            <p className="text-[11px] font-semibold text-[#6C151E]">{formErrors.imageUrl}</p>
+          )}
 
           <div className="space-y-1">
             <label htmlFor="srv-short" className="block text-xs font-bold">
@@ -718,18 +755,37 @@ export function AdminServicesPanel({
                   <tr key={srv.id} className="hover:bg-[#F8F8E1]/40">
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2.5 min-w-[220px]">
-                        <div className="w-14 shrink-0 border-2 border-[#171717] rounded-[2px] overflow-hidden bg-white">
+                        <div className="relative w-14 shrink-0 border-2 border-[#171717] rounded-[2px] overflow-hidden bg-white">
                           <StudioImage
                             src={srv.imageUrl}
                             driveFileId={srv.driveFileId}
+                            cacheVersion={srv.updatedAt}
                             alt={srv.title}
                             aspectClass="aspect-[16/10]"
+                            onStatusChange={(status) => {
+                              setFailedThumbs((prev) => {
+                                const nextErr = status === 'error';
+                                if (Boolean(prev[srv.id]) === nextErr) return prev;
+                                return { ...prev, [srv.id]: nextErr };
+                              });
+                            }}
                           />
+                          {failedThumbs[srv.id] && (
+                            <span
+                              title="Thumbnail gagal dimuat — klik Edit untuk memeriksa"
+                              className="absolute top-0.5 right-0.5 w-4 h-4 bg-[#6C151E] text-[#F8F8E1] rounded-[2px] flex items-center justify-center"
+                            >
+                              <AlertTriangle className="w-2.5 h-2.5" />
+                            </span>
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="font-semibold text-[#171717] line-clamp-1">{srv.title}</p>
                           <p className="text-[11px] font-mono text-[#525252] truncate">
                             /layanan/{srv.slug}
+                            {srv.gallery && srv.gallery.length > 0
+                              ? ` · +${srv.gallery.length} galeri`
+                              : ''}
                           </p>
                         </div>
                       </div>

@@ -9,21 +9,25 @@ import {
   Layers,
 } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
+import { useDesign } from '../contexts/DesignContext';
 import { StudioImage } from '../components/StudioImage';
 import { MediaGallerySection } from '../components/MediaGallerySection';
 import { ProductCard } from '../components/ProductCard';
 import { SectionHeader } from '../components/SectionHeader';
+import { FadeScroll } from '../components/FadeScroll';
 import {
   buildProductWhatsappMessage,
   buildWhatsappLink,
-  CATALOG_GRID_COLS_CLASS,
   DIGITAL_PRODUCT_CATEGORY_LABELS,
   formatRupiah,
 } from '../utils/studioLogic';
+import { getAspectClass } from '../utils/designSystem';
 
 export function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { products, loadingProducts, siteSettings } = useStudioData();
+  const { design, viewport } = useDesign();
+  const detailCfg = design.otherPages.detailPages;
 
   if (loadingProducts) {
     return (
@@ -63,16 +67,32 @@ export function ProductDetailPage() {
 
   const related = products
     .filter((item) => item.isPublished && item.id !== product.id)
-    .slice(0, 5);
+    .slice(0, detailCfg.relatedColsDesktop);
 
   const waHref = buildWhatsappLink(
     siteSettings.whatsappNumber,
     buildProductWhatsappMessage(product)
   );
 
+  const isTopImage = detailCfg.imagePosition === 'top' || viewport !== 'desktop';
+  const isRightImage = detailCfg.imagePosition === 'right' && viewport === 'desktop';
+  const aspectClass = getAspectClass(detailCfg.imageAspectRatio);
+
+  const relatedCols =
+    viewport === 'mobile'
+      ? 2
+      : viewport === 'tablet'
+        ? Math.min(3, detailCfg.relatedColsDesktop)
+        : detailCfg.relatedColsDesktop;
+
   return (
     <div className="nb-section">
-      <div className="nb-container space-y-6">
+      <div
+        className="nb-container space-y-6"
+        style={{
+          maxWidth: `${detailCfg.maxWidthPx > 0 ? detailCfg.maxWidthPx : design.global.containerMaxWidthPx}px`,
+        }}
+      >
         {/* Compact Breadcrumb */}
         <nav aria-label="Breadcrumb" className="nb-breadcrumb">
           <Link to="/" className="hover:text-[#0F3D3A] font-medium transition-colors">
@@ -88,22 +108,39 @@ export function ProductDetailPage() {
           </span>
         </nav>
 
-        {/* Compact Horizontal Product Overview Card */}
+        {/* Product Overview Card */}
         <div className="nb-card overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
+          <div className={`grid items-stretch ${isTopImage ? 'grid-cols-1' : 'grid-cols-12'}`}>
             {/* Controlled Product Preview Frame */}
-            <div className="lg:col-span-5 border-b-2 lg:border-b-0 lg:border-r-2 border-[#171717] bg-[#F1F1D3] flex">
+            <div
+              className={`${
+                isTopImage
+                  ? 'border-b-2'
+                  : isRightImage
+                    ? 'col-span-5 order-2 border-l-2'
+                    : 'col-span-5 order-1 border-r-2'
+              } border-[#171717] bg-[#F1F1D3] flex`}
+            >
               <StudioImage
                 src={product.imageUrl}
                 driveFileId={product.driveFileId}
+                cacheVersion={product.updatedAt}
                 alt={product.title}
-                aspectClass="w-full aspect-[4/3] max-h-[280px] lg:aspect-auto lg:h-full lg:max-h-none"
+                aspectClass={
+                  isTopImage
+                    ? `w-full ${aspectClass} max-h-[380px]`
+                    : `w-full ${aspectClass} lg:aspect-auto lg:h-full`
+                }
                 loading="eager"
               />
             </div>
 
             {/* Contiguous Purchase Module */}
-            <div className="lg:col-span-7 p-4 sm:p-5 lg:p-6 flex flex-col justify-between gap-4">
+            <div
+              className={`${
+                isTopImage ? '' : isRightImage ? 'col-span-7 order-1' : 'col-span-7 order-2'
+              } p-4 sm:p-5 lg:p-6 flex flex-col justify-between gap-4`}
+            >
               <div className="space-y-1.5">
                 <p className="nb-kicker">
                   {DIGITAL_PRODUCT_CATEGORY_LABELS[product.category]}
@@ -179,56 +216,72 @@ export function ProductDetailPage() {
 
         {/* Balanced Full Description & Deliverables Row */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-          <div className="lg:col-span-7 nb-card p-4 sm:p-5 space-y-2 h-full">
-            <h2 className="font-display font-bold text-base sm:text-lg text-[#171717]">
-              Informasi Lengkap Produk
-            </h2>
-            <p className="text-xs sm:text-sm text-[#333333] leading-relaxed whitespace-pre-line">
-              {product.description}
-            </p>
-          </div>
+          <FadeScroll index={0} columnsPerRow={2} className="lg:col-span-7 h-full">
+            <div className="nb-card p-4 sm:p-5 space-y-2 h-full">
+              <h2 className="font-display font-bold text-base sm:text-lg text-[#171717]">
+                Informasi Lengkap Produk
+              </h2>
+              <p className="text-xs sm:text-sm text-[#333333] leading-relaxed whitespace-pre-line">
+                {product.description}
+              </p>
+            </div>
+          </FadeScroll>
 
-          <div className="lg:col-span-5 nb-card p-4 sm:p-5 space-y-2.5 h-full">
-            <h2 className="font-display font-bold text-base sm:text-lg text-[#171717]">
-              Isi Paket & Deliverable
-            </h2>
-            <ul className="space-y-2">
-              {product.includes.map((point, idx) => (
-                <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-[#262626]">
-                  <span className="w-4 h-4 mt-0.5 shrink-0 bg-[#F3C95B] border-2 border-[#171717] flex items-center justify-center">
-                    <Check className="w-2.5 h-2.5 text-[#171717]" />
-                  </span>
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <FadeScroll index={1} columnsPerRow={2} className="lg:col-span-5 h-full">
+            <div className="nb-card p-4 sm:p-5 space-y-2.5 h-full">
+              <h2 className="font-display font-bold text-base sm:text-lg text-[#171717]">
+                Isi Paket &amp; Deliverable
+              </h2>
+              <ul className="space-y-2">
+                {product.includes.map((point, idx) => (
+                  <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-[#262626]">
+                    <span className="w-4 h-4 mt-0.5 shrink-0 bg-[#F3C95B] border-2 border-[#171717] flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5 text-[#171717]" />
+                    </span>
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </FadeScroll>
         </div>
 
         {/* Photo & Video Documentation Gallery */}
-        {product.gallery && product.gallery.length > 0 && (
-          <section className="nb-card p-4 sm:p-5">
-            <MediaGallerySection
-              items={product.gallery}
-              title="Galeri Dokumentasi Produk"
-            />
-          </section>
+        {detailCfg.showGallery && product.gallery && product.gallery.length > 0 && (
+          <FadeScroll index={0}>
+            <section className="nb-card p-4 sm:p-5">
+              <MediaGallerySection
+                items={product.gallery}
+                title="Galeri Dokumentasi Produk"
+                cacheVersion={product.updatedAt}
+              />
+            </section>
+          </FadeScroll>
         )}
 
         {/* Related Products */}
-        {related.length > 0 && (
+        {detailCfg.showRelated && related.length > 0 && (
           <section className="pt-6 border-t-2 border-[#171717] space-y-4">
-            <SectionHeader
-              title="Produk Digital Lainnya"
-              action={
-                <Link to="/produk" className="nb-btn nb-btn-surface nb-btn-sm">
-                  Lihat Semua
-                </Link>
-              }
-            />
-            <div className={`grid ${CATALOG_GRID_COLS_CLASS} gap-2.5 sm:gap-3 items-stretch`}>
-              {related.map((item) => (
-                <ProductCard key={item.id} product={item} />
+            <FadeScroll index={0}>
+              <SectionHeader
+                title="Produk Digital Lainnya"
+                action={
+                  <Link to="/produk" className="nb-btn nb-btn-surface nb-btn-sm">
+                    Lihat Semua
+                  </Link>
+                }
+              />
+            </FadeScroll>
+            <div
+              className="grid gap-2.5 sm:gap-3 items-stretch"
+              style={{
+                gridTemplateColumns: `repeat(${relatedCols}, minmax(0, 1fr))`,
+              }}
+            >
+              {related.map((item, idx) => (
+                <FadeScroll key={item.id} index={idx} columnsPerRow={relatedCols} className="h-full">
+                  <ProductCard product={item} />
+                </FadeScroll>
               ))}
             </div>
           </section>
