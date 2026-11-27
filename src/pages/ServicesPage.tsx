@@ -4,6 +4,7 @@ import { ChevronRight, Search } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
 import { ServiceCard } from '../components/ServiceCard';
 import { ServiceCardSkeleton } from '../components/SkeletonCard';
+import { VelocityLayer } from '../components/ScrollMotionPrimitives';
 import { CATALOG_GRID_COLS_CLASS, SERVICE_CATEGORY_LABELS } from '../utils/studioLogic';
 import type { ServiceCategory } from '../types/studio';
 
@@ -143,8 +144,18 @@ export function ServicesPage() {
           </div>
         ) : (
           <div className={`grid ${CATALOG_GRID_COLS_CLASS} gap-2.5 sm:gap-3 items-stretch`}>
-            {filteredServices.map((srv) => (
-              <ServiceCard key={srv.id} service={srv} />
+            {filteredServices.map((srv, idx) => (
+              <VelocityLayer
+                key={srv.id}
+                speed={[-0.08, 0.02, 0.1, 0.02, -0.08][idx % 5]}
+                velocityFactor={[0.55, 0.9, 1.25, 0.9, 0.55][idx % 5]}
+                maxOffsetPx={18}
+                maxVelocityShiftPx={24}
+                maxSkewDeg={1.2}
+                className="h-full"
+              >
+                <ServiceCard service={srv} />
+              </VelocityLayer>
             ))}
           </div>
         )}

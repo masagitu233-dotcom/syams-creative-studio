@@ -4,6 +4,7 @@ import { ChevronRight, Search } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
 import { ProductCard } from '../components/ProductCard';
 import { ServiceCardSkeleton } from '../components/SkeletonCard';
+import { VelocityLayer } from '../components/ScrollMotionPrimitives';
 import {
   CATALOG_GRID_COLS_CLASS,
   DIGITAL_PRODUCT_CATEGORY_LABELS,
@@ -144,8 +145,18 @@ export function ProductsPage() {
           </div>
         ) : (
           <div className={`grid ${gridCols} gap-2.5 sm:gap-3 items-stretch`}>
-            {filtered.map((product) => (
-              <ProductCard key={product.id} product={product} />
+            {filtered.map((product, idx) => (
+              <VelocityLayer
+                key={product.id}
+                speed={[-0.08, 0.02, 0.1, 0.02, -0.08][idx % 5]}
+                velocityFactor={[0.55, 0.9, 1.25, 0.9, 0.55][idx % 5]}
+                maxOffsetPx={18}
+                maxVelocityShiftPx={24}
+                maxSkewDeg={1.15}
+                className="h-full"
+              >
+                <ProductCard product={product} />
+              </VelocityLayer>
             ))}
           </div>
         )}

@@ -5,6 +5,7 @@ import { useStudioData } from '../contexts/StudioDataContext';
 import { PortfolioCard } from '../components/PortfolioCard';
 import { PortfolioCardSkeleton } from '../components/SkeletonCard';
 import { PortfolioModal } from '../components/PortfolioModal';
+import { VelocityLayer } from '../components/ScrollMotionPrimitives';
 import { CATALOG_GRID_COLS_CLASS, SERVICE_CATEGORY_LABELS } from '../utils/studioLogic';
 import type { PortfolioItem, ServiceCategory } from '../types/studio';
 
@@ -147,12 +148,21 @@ export function PortfolioPage() {
           </div>
         ) : (
           <div className={`grid ${CATALOG_GRID_COLS_CLASS} gap-2.5 sm:gap-3 items-stretch`}>
-            {filtered.map((item) => (
-              <PortfolioCard
+            {filtered.map((item, idx) => (
+              <VelocityLayer
                 key={item.id}
-                item={item}
-                onSelect={(selected) => setActiveItem(selected)}
-              />
+                speed={[-0.08, 0.02, 0.1, 0.02, -0.08][idx % 5]}
+                velocityFactor={[0.6, 0.95, 1.3, 0.95, 0.6][idx % 5]}
+                maxOffsetPx={18}
+                maxVelocityShiftPx={24}
+                maxSkewDeg={1.25}
+                className="h-full"
+              >
+                <PortfolioCard
+                  item={item}
+                  onSelect={(selected) => setActiveItem(selected)}
+                />
+              </VelocityLayer>
             ))}
           </div>
         )}

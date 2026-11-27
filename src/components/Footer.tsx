@@ -21,7 +21,7 @@ export function Footer() {
   );
 
   return (
-    <footer className="bg-[#0F3D3A] text-[#F8F8E1] border-t-2 border-[#171717]">
+    <footer className="relative z-[25] bg-[#0F3D3A] text-[#F8F8E1] border-t-2 border-[#171717]">
       <div className="nb-container py-9">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-7">
           <div className="lg:col-span-5 space-y-2.5">

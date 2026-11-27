@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Lock, MessageSquare } from 'lucide-react';
 import { SectionHeader } from '../components/SectionHeader';
 import { Reveal } from '../components/Reveal';
+import { VelocityLayer } from '../components/ScrollMotionPrimitives';
 
 const DETAILED_STEPS = [
   {
@@ -71,28 +72,38 @@ export function OrderProcedurePage() {
 
         {/* Symmetrical 2-col / 3-col Step Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
-          {DETAILED_STEPS.map((step) => (
-            <div key={step.number} className="nb-card p-4 sm:p-5 flex flex-col gap-3 h-full">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 shrink-0 bg-[#0F3D3A] text-[#F3C95B] border-2 border-[#171717] rounded-[2px] flex items-center justify-center font-mono font-bold text-xs">
-                  {step.number}
+          {DETAILED_STEPS.map((step, idx) => (
+            <VelocityLayer
+              key={step.number}
+              speed={[-0.08, 0.06, -0.08][idx % 3]}
+              velocityFactor={0.55 + (idx % 3) * 0.28}
+              maxOffsetPx={16}
+              maxVelocityShiftPx={22}
+              maxSkewDeg={1.0}
+              className="h-full"
+            >
+              <div className="nb-card p-4 sm:p-5 flex flex-col gap-3 h-full">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 bg-[#0F3D3A] text-[#F3C95B] border-2 border-[#171717] rounded-[2px] flex items-center justify-center font-mono font-bold text-xs">
+                    {step.number}
+                  </div>
+                  <h2 className="font-display font-bold text-base text-[#171717] leading-snug">
+                    {step.title}
+                  </h2>
                 </div>
-                <h2 className="font-display font-bold text-base text-[#171717] leading-snug">
-                  {step.title}
-                </h2>
+
+                <p className="text-xs sm:text-sm text-[#333333] leading-relaxed">{step.summary}</p>
+
+                <ul className="space-y-1.5 pt-2.5 mt-auto border-t border-[#171717]/15">
+                  {step.notes.map((note, nIdx) => (
+                    <li key={nIdx} className="flex items-start gap-2 text-xs text-[#404040]">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#0F3D3A] shrink-0 mt-0.5" />
+                      <span>{note}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-
-              <p className="text-xs sm:text-sm text-[#333333] leading-relaxed">{step.summary}</p>
-
-              <ul className="space-y-1.5 pt-2.5 mt-auto border-t border-[#171717]/15">
-                {step.notes.map((note, nIdx) => (
-                  <li key={nIdx} className="flex items-start gap-2 text-xs text-[#404040]">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#0F3D3A] shrink-0 mt-0.5" />
-                    <span>{note}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            </VelocityLayer>
           ))}
 
           {/* 6th Balanced CTA Slot in 3x2 Grid */}

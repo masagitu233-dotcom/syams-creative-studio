@@ -5,6 +5,7 @@ import { STUDIO_IMAGES } from '../data/initialCatalog';
 import { StudioImage } from '../components/StudioImage';
 import { SectionHeader } from '../components/SectionHeader';
 import { Reveal } from '../components/Reveal';
+import { VelocityLayer } from '../components/ScrollMotionPrimitives';
 
 const VALUES = [
   {
@@ -64,12 +65,21 @@ export function AboutPage() {
                 </div>
               </div>
 
-              <div className="lg:col-span-5 border-t-2 lg:border-t-0 lg:border-l-2 border-[#171717] bg-[#F8F8E1] flex">
-                <StudioImage
-                  src={STUDIO_IMAGES.hero}
-                  alt="Ruang kerja SYAMS CREATIVE STUDIO"
-                  aspectClass="w-full aspect-[16/10] max-h-[280px] lg:aspect-auto lg:h-full lg:max-h-none"
-                />
+              <div className="lg:col-span-5 border-t-2 lg:border-t-0 lg:border-l-2 border-[#171717] bg-[#F8F8E1] flex overflow-hidden">
+                <VelocityLayer
+                  speed={-0.36}
+                  velocityFactor={0.95}
+                  maxOffsetPx={48}
+                  maxVelocityShiftPx={18}
+                  baseScale={1.2}
+                  className="w-full h-full flex"
+                >
+                  <StudioImage
+                    src={STUDIO_IMAGES.hero}
+                    alt="Ruang kerja SYAMS CREATIVE STUDIO"
+                    aspectClass="w-full aspect-[16/10] max-h-[280px] lg:aspect-auto lg:h-full lg:max-h-none"
+                  />
+                </VelocityLayer>
               </div>
             </div>
           </div>
@@ -83,17 +93,26 @@ export function AboutPage() {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
-            {VALUES.map((val) => (
-              <div
+            {VALUES.map((val, idx) => (
+              <VelocityLayer
                 key={val.code}
-                className={`${val.bg} border-2 border-[#171717] nb-shadow rounded-[4px] p-4 sm:p-5 flex flex-col gap-2 h-full`}
+                speed={[-0.08, 0.06, -0.08][idx % 3]}
+                velocityFactor={0.55 + idx * 0.25}
+                maxOffsetPx={16}
+                maxVelocityShiftPx={22}
+                maxSkewDeg={1.0}
+                className="h-full"
               >
-                <p className="font-mono font-bold text-xs text-[#6C151E]">{val.code}.</p>
-                <h3 className="font-display font-bold text-base text-[#171717]">
-                  {val.title}
-                </h3>
-                <p className="text-xs sm:text-sm text-[#333333] leading-relaxed">{val.body}</p>
-              </div>
+                <div
+                  className={`${val.bg} border-2 border-[#171717] nb-shadow rounded-[4px] p-4 sm:p-5 flex flex-col gap-2 h-full`}
+                >
+                  <p className="font-mono font-bold text-xs text-[#6C151E]">{val.code}.</p>
+                  <h3 className="font-display font-bold text-base text-[#171717]">
+                    {val.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#333333] leading-relaxed">{val.body}</p>
+                </div>
+              </VelocityLayer>
             ))}
           </div>
         </section>

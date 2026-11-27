@@ -39,7 +39,6 @@
   body {
     background-color: #F8F8E1;
     color: #171717;
-    overflow-x: clip;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -657,9 +656,116 @@ html[data-theme="clean_bento"] .bg-\[\#171717\]\/80 {
   -webkit-backdrop-filter: blur(4px);
 }
 
+/* ============================================================================
+   Velocity Scroll & Overlapping Section Animation Layer
+   Theme-calibrated for both Neo Brutalist and Clean Bento Grid.
+   ============================================================================ */
+
+.scs-velocity-layer {
+  will-change: transform;
+  transform-origin: center center;
+}
+
+.scs-overlap-section {
+  overflow-x: clip;
+  isolation: isolate;
+}
+
+/* Keep Section 5 (Keunggulan) visually identical in Neo Brutalist while 100% opaque for clean overlap */
+.scs-overlap-section.bg-\[\#8ACCD5\]\/20 {
+  background-color: #E2EFDF;
+}
+
+.scs-overlap-inner {
+  will-change: transform;
+  transform-origin: center top;
+}
+
+.scs-overlap-shade {
+  background: linear-gradient(
+    to bottom,
+    rgba(23, 23, 23, 0.22) 0%,
+    rgba(15, 61, 58, 0.48) 100%
+  );
+  transition: opacity 70ms linear;
+  z-index: 2;
+}
+
+/* Neo Brutalist rising section curtain: bold 3px ink top plate + crisp architectural lift */
+.scs-overlap-curtain {
+  border-top: 3px solid #171717;
+  margin-top: -2px;
+  box-shadow:
+    0 -6px 0 0 rgba(23, 23, 23, 0.14),
+    0 -22px 44px -8px rgba(23, 23, 23, 0.32);
+}
+
+/* Clean Bento Grid rising section curtain: unmistakable 28px rounded stacked deck elevation */
+html[data-theme="clean_bento"] .scs-overlap-curtain {
+  border-top: 1px solid rgba(15, 61, 58, 0.12);
+  margin-top: 0;
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  box-shadow:
+    0 -24px 56px -10px rgba(15, 61, 58, 0.26),
+    0 -4px 12px -2px rgba(15, 61, 58, 0.08);
+}
+
+html[data-theme="clean_bento"] .scs-overlap-curtain::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 4px;
+  border-radius: 9999px;
+  background-color: rgba(15, 61, 58, 0.14);
+  pointer-events: none;
+  z-index: 5;
+}
+
+html[data-theme="clean_bento"] .scs-overlap-shade {
+  background: linear-gradient(
+    to bottom,
+    rgba(15, 61, 58, 0.16) 0%,
+    rgba(15, 61, 58, 0.42) 100%
+  );
+}
+
+/* Theme-aware purely decorative parallax depth accents */
+.scs-deco-accent {
+  pointer-events: none;
+  user-select: none;
+}
+
+html[data-theme="clean_bento"] .scs-deco-accent {
+  border-width: 1px;
+  border-color: rgba(15, 61, 58, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 12px 28px -12px rgba(15, 61, 58, 0.16);
+  opacity: 0.72;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  .scs-velocity-layer,
+  .scs-overlap-inner {
+    transform: none !important;
+    border-radius: 0 !important;
+    will-change: auto !important;
+  }
+
+  .scs-overlap-section {
+    position: relative !important;
+    top: auto !important;
+  }
+
+  .scs-overlap-shade {
+    opacity: 0 !important;
   }
 
   *,
