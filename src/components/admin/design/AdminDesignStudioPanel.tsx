@@ -1194,7 +1194,7 @@ export function AdminDesignStudioPanel({
                   usage="hero"
                   entityKey="design-logo"
                   allowEmpty
-                  emptyHint="Kosongkan untuk menampilkan teks OSAMA CREATIVE STUDIO hingga logo baru diunggah."
+                  emptyHint="Kosongkan untuk memakai logo resmi OSAMA CREATIVE STUDIO bawaan."
                   imageUrl={draft.identity.logoUrl}
                   driveFileId={draft.identity.logoDriveFileId}
                   media={media}
@@ -1216,7 +1216,7 @@ export function AdminDesignStudioPanel({
                   usage="hero"
                   entityKey="design-favicon"
                   allowEmpty
-                  emptyHint="Kosongkan untuk memakai ikon tab bawaan."
+                  emptyHint="Kosongkan untuk memakai favicon simbol resmi OSAMA CREATIVE STUDIO."
                   imageUrl={draft.identity.faviconUrl}
                   driveFileId={draft.identity.faviconDriveFileId}
                   media={media}

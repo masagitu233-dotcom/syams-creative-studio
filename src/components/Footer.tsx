@@ -4,7 +4,13 @@ import { ArrowUpRight } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useDesign } from '../contexts/DesignContext';
-import { buildMediaImageCandidates, buildWhatsappLink, sanitizeHttpUrl } from '../utils/studioLogic';
+import { BRAND_ASSETS } from '../data/initialCatalog';
+import {
+  buildMediaImageCandidates,
+  buildWhatsappLink,
+  isDarkColorHex,
+  sanitizeHttpUrl,
+} from '../utils/studioLogic';
 import { FadeScroll } from './FadeScroll';
 
 export function Footer() {
@@ -15,7 +21,7 @@ export function Footer() {
   const footerCfg = design.footer;
   const identity = design.identity;
 
-  const logoSrc = useMemo(() => {
+  const customLogoSrc = useMemo(() => {
     if (!identity.logoUrl && !identity.logoDriveFileId) return '';
     return (
       buildMediaImageCandidates({
@@ -25,6 +31,10 @@ export function Footer() {
       })[0]?.url || ''
     );
   }, [identity.logoUrl, identity.logoDriveFileId]);
+
+  const logoSrc = customLogoSrc || BRAND_ASSETS.logoUrl;
+  const isOfficialFullLogo = !customLogoSrc;
+  const isDarkFooterBg = isDarkColorHex(footerCfg.backgroundColor, true);
 
   if (!footerCfg.visible) return null;
 
@@ -112,18 +122,20 @@ export function Footer() {
             >
               <Link
                 to="/"
+                aria-label={siteSettings.studioName}
                 onClick={blockLink}
-                className="font-display font-bold text-lg tracking-tight inline-flex items-center gap-2"
+                className="font-display font-bold text-lg tracking-tight inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
               >
-                {logoSrc && (
-                  <img
-                    src={logoSrc}
-                    alt={`Logo ${siteSettings.studioName}`}
-                    style={{ height: `${Math.min(40, identity.logoHeightPx)}px` }}
-                    className="w-auto object-contain bg-white/95 rounded-[4px] p-0.5"
-                  />
-                )}
-                <span>{siteSettings.studioName}</span>
+                <img
+                  src={logoSrc}
+                  alt={siteSettings.studioName}
+                  loading="lazy"
+                  decoding="async"
+                  className={`h-11 sm:h-12 w-auto max-w-[205px] object-contain shrink-0 select-none ${
+                    isDarkFooterBg ? 'brightness-0 invert opacity-95' : ''
+                  }`}
+                />
+                {!isOfficialFullLogo && <span>{siteSettings.studioName}</span>}
               </Link>
               <p className="font-display font-semibold text-sm text-[#F3C95B]" style={accentStyle}>
                 {siteSettings.slogan}

@@ -20,6 +20,7 @@ import {
   formatServicePriceLabel,
   generateOrderCode,
   getProductGridColsClass,
+  isDarkColorHex,
   isPublicPublishedMediaAsset,
   isValidVisualTheme,
   isValidWhatsappNumber,
@@ -858,6 +859,18 @@ test('normalizeBrandDisplayText updates legacy brand names to OSAMA CREATIVE STU
   );
   assert.equal(normalizeBrandDisplayText('Tim SYAMS CREATIVE STUDIO'), 'Tim OSAMA CREATIVE STUDIO');
   assert.equal(normalizeBrandDisplayText('Tentang SYAMS Studio'), 'Tentang OSAMA Studio');
+});
+
+test('isDarkColorHex accurately classifies dark vs light hex surfaces and respects fallback', () => {
+  assert.equal(isDarkColorHex('#0F3D3A'), true);
+  assert.equal(isDarkColorHex('#171717'), true);
+  assert.equal(isDarkColorHex('#6C151E'), true);
+  assert.equal(isDarkColorHex('#F8F8E1'), false);
+  assert.equal(isDarkColorHex('#FFFFFF'), false);
+  assert.equal(isDarkColorHex('#fff'), false);
+  assert.equal(isDarkColorHex('#000'), true);
+  assert.equal(isDarkColorHex('', true), true);
+  assert.equal(isDarkColorHex('', false), false);
 });
 
 

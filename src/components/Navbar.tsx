@@ -5,7 +5,8 @@ import { Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useStudioData } from '../contexts/StudioDataContext';
 import { useDesign } from '../contexts/DesignContext';
-import { buildMediaImageCandidates } from '../utils/studioLogic';
+import { BRAND_ASSETS } from '../data/initialCatalog';
+import { buildMediaImageCandidates, isDarkColorHex } from '../utils/studioLogic';
 
 const BASE_DESKTOP_NAV = [
   { to: '/layanan', label: 'Layanan' },
@@ -39,7 +40,7 @@ export function Navbar() {
     return items;
   }, [design.articles.showInNavigation]);
 
-  const logoSrc = useMemo(() => {
+  const customLogoSrc = useMemo(() => {
     if (!identity.logoUrl && !identity.logoDriveFileId) return '';
     return (
       buildMediaImageCandidates({
@@ -49,6 +50,11 @@ export function Navbar() {
       })[0]?.url || ''
     );
   }, [identity.logoUrl, identity.logoDriveFileId]);
+
+  const logoSrc = customLogoSrc || BRAND_ASSETS.logoUrl;
+  const isOfficialFullLogo = !customLogoSrc;
+  const isDarkHeaderBg = isDarkColorHex(headerCfg.backgroundColor, false);
+  const hasCustomLogoHeight = identity.logoHeightPx !== 32;
 
   if (!headerCfg.visible) return null;
 
@@ -72,6 +78,7 @@ export function Navbar() {
   const brandElement = (
     <Link
       to="/"
+      aria-label={siteSettings.studioName}
       onClick={(e) => {
         if (isEmbeddedPreview) e.preventDefault();
         setMobileOpen(false);
@@ -79,15 +86,19 @@ export function Navbar() {
       className="inline-flex items-center gap-2 font-display font-bold text-sm sm:text-base tracking-tight hover:opacity-85 transition-opacity whitespace-nowrap shrink-0"
       style={headerCfg.textColor ? { color: headerCfg.textColor } : undefined}
     >
-      {logoSrc && (
-        <img
-          src={logoSrc}
-          alt={`Logo ${siteSettings.studioName}`}
-          style={{ height: `${identity.logoHeightPx}px` }}
-          className="w-auto object-contain shrink-0"
-        />
-      )}
-      {(!logoSrc || identity.showLogoText) && <span>{siteSettings.studioName}</span>}
+      <img
+        src={logoSrc}
+        alt={siteSettings.studioName}
+        loading="eager"
+        decoding="async"
+        style={hasCustomLogoHeight ? { height: `${identity.logoHeightPx}px` } : undefined}
+        className={`${
+          hasCustomLogoHeight
+            ? 'w-auto max-w-[165px] sm:max-w-[210px]'
+            : 'h-9 sm:h-11 w-auto max-w-[160px] sm:max-w-[205px]'
+        } object-contain shrink-0 select-none ${isDarkHeaderBg ? 'brightness-0 invert opacity-95' : ''}`}
+      />
+      {!isOfficialFullLogo && identity.showLogoText && <span>{siteSettings.studioName}</span>}
     </Link>
   );
 

@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { useStudioData } from './StudioDataContext';
+import { BRAND_ASSETS } from '../data/initialCatalog';
 import {
   normalizeVisualTheme,
   readCachedVisualTheme,
@@ -46,18 +47,12 @@ function ThemeLoadingShell() {
       style={{ backgroundColor: '#F6F6F2', color: '#171717' }}
     >
       <div className="flex flex-col items-center gap-3">
-        <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center font-display font-bold text-sm tracking-tight"
-          style={{ backgroundColor: '#0F3D3A', color: '#F6F6F2' }}
-        >
-          OC
-        </div>
-        <div className="text-center space-y-1">
-          <p className="font-display font-bold text-sm tracking-tight text-[#171717]">
-            OSAMA CREATIVE STUDIO
-          </p>
-          <p className="text-xs text-[#525252]">Menyiapkan tampilan studio...</p>
-        </div>
+        <img
+          src={BRAND_ASSETS.logoUrl}
+          alt="OSAMA CREATIVE STUDIO"
+          className="h-11 sm:h-12 w-auto max-w-[200px] object-contain select-none"
+        />
+        <p className="text-xs text-[#525252]">Menyiapkan tampilan studio...</p>
         <span
           aria-hidden="true"
           className="w-5 h-5 rounded-full border-2 border-[#0F3D3A]/20 border-t-[#0F3D3A] animate-spin mt-1"

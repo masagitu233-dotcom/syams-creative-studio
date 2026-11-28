@@ -40,7 +40,7 @@ import {
   ORDER_STATUS_META,
 } from '../utils/studioLogic';
 import { logMediaDiagnostic } from '../utils/mediaDiagnostics';
-import { INITIAL_SITE_SETTINGS } from '../data/initialCatalog';
+import { BRAND_ASSETS, INITIAL_SITE_SETTINGS } from '../data/initialCatalog';
 import { AdminOrdersPanel } from '../components/admin/AdminOrdersPanel';
 import { AdminProductsPanel } from '../components/admin/AdminProductsPanel';
 import { AdminServicesPanel } from '../components/admin/AdminServicesPanel';
@@ -312,7 +312,12 @@ export function AdminDashboardPage() {
   if (!authReady || checkingRole) {
     return (
       <div className="min-h-screen bg-[#F8F8E1] flex items-center justify-center p-4">
-        <div className="nb-card p-6 max-w-md w-full space-y-2.5 text-center">
+        <div className="nb-card p-6 max-w-md w-full space-y-3 text-center">
+          <img
+            src={BRAND_ASSETS.logoUrl}
+            alt="OSAMA CREATIVE STUDIO"
+            className="h-9 sm:h-10 w-auto max-w-[180px] object-contain mx-auto select-none"
+          />
           <p className="font-display font-bold text-base text-[#171717]">
             Memverifikasi Akses Administrator...
           </p>
@@ -329,11 +334,17 @@ export function AdminDashboardPage() {
     return (
       <div className="min-h-screen bg-[#F8F8E1] nb-grid-pattern flex items-center justify-center p-4">
         <div className="nb-card max-w-md w-full p-5 sm:p-6 space-y-4">
-          <div className="w-9 h-9 bg-[#0F3D3A] text-[#F3C95B] border-2 border-[#171717] rounded-[2px] nb-shadow-sm flex items-center justify-center">
-            <Lock className="w-4 h-4" />
+          <div className="flex items-center justify-between gap-3">
+            <img
+              src={BRAND_ASSETS.logoUrl}
+              alt="OSAMA CREATIVE STUDIO"
+              className="h-10 sm:h-11 w-auto max-w-[195px] object-contain select-none"
+            />
+            <div className="w-9 h-9 bg-[#0F3D3A] text-[#F3C95B] border-2 border-[#171717] rounded-[2px] nb-shadow-sm flex items-center justify-center shrink-0">
+              <Lock className="w-4 h-4" />
+            </div>
           </div>
           <div className="space-y-1.5">
-            <p className="nb-kicker">OSAMA CREATIVE STUDIO</p>
             <h1 className="font-display font-bold text-xl sm:text-2xl text-[#171717]">
               Portal Administrator Utama
             </h1>
@@ -439,12 +450,20 @@ export function AdminDashboardPage() {
   const sidebarNavContent = (
     <div className="flex flex-col justify-between h-full">
       <div>
-        <div className="px-4 h-14 border-b-2 border-[#171717] flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <Link to="/" className="font-display font-bold text-sm text-[#F3C95B] leading-tight block truncate">
-              OSAMA CREATIVE STUDIO
+        <div className="px-3.5 py-2.5 min-h-[60px] border-b-2 border-[#171717] flex items-center justify-between gap-2">
+          <div className="min-w-0 space-y-0.5">
+            <Link
+              to="/"
+              aria-label="OSAMA CREATIVE STUDIO"
+              className="inline-flex items-center hover:opacity-90 transition-opacity"
+            >
+              <img
+                src={BRAND_ASSETS.logoUrl}
+                alt="OSAMA CREATIVE STUDIO"
+                className="h-8 w-auto max-w-[162px] object-contain brightness-0 invert opacity-95 select-none"
+              />
             </Link>
-            <p className="text-[11px] text-[#F8F8E1]/75 truncate">Panel Admin Produksi</p>
+            <p className="text-[10px] text-[#F8F8E1]/75 truncate">Panel Admin Produksi</p>
           </div>
           <button
             type="button"

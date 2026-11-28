@@ -732,6 +732,28 @@ export function normalizeBrandDisplayText(text: string): string {
     .replace(/\bAdmin Utama SYAMS\b/g, 'Admin Utama OSAMA');
 }
 
+export function isDarkColorHex(hex?: string | null, fallbackDark = false): boolean {
+  if (!hex || typeof hex !== 'string') return fallbackDark;
+  const clean = hex.trim().replace(/^#/, '');
+  let r: number;
+  let g: number;
+  let b: number;
+  if (/^[0-9a-fA-F]{3}$/.test(clean)) {
+    r = parseInt(clean[0] + clean[0], 16);
+    g = parseInt(clean[1] + clean[1], 16);
+    b = parseInt(clean[2] + clean[2], 16);
+  } else if (/^[0-9a-fA-F]{6}$/.test(clean) || /^[0-9a-fA-F]{8}$/.test(clean)) {
+    r = parseInt(clean.slice(0, 2), 16);
+    g = parseInt(clean.slice(2, 4), 16);
+    b = parseInt(clean.slice(4, 6), 16);
+  } else {
+    return fallbackDark;
+  }
+  // Relative perceptual luminance (0..255)
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance < 135;
+}
+
 export function buildProductWhatsappMessage(product: DigitalProductItem): string {
   const priceText = product.showPrice ? ` (${formatRupiah(product.price)})` : '';
   return `Halo Admin OSAMA CREATIVE STUDIO, saya ingin memesan produk digital "${product.title}"${priceText}. Mohon informasi cara pembayaran dan pengiriman filenya.`;

@@ -9,6 +9,11 @@ export const STUDIO_IMAGES = {
   speech: '/src/assets/images/service_speech_script_1795683062509.jpg',
 } as const;
 
+export const BRAND_ASSETS = {
+  logoUrl: '/assets/aistudio/Osama_Creative_Studio_Logo_e36884c7.png',
+  faviconUrl: '/assets/aistudio/osama-favicon.png',
+} as const;
+
 export const INITIAL_SITE_SETTINGS: SiteSettings = {
   id: 'general',
   studioName: 'OSAMA CREATIVE STUDIO',
