@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Calendar, Clock, X } from 'lucide-react';
 import { useStudioData } from '../contexts/StudioDataContext';
 import { useDesign } from '../contexts/DesignContext';
-import { STUDIO_IMAGES } from '../data/initialCatalog';
+import { BRAND_ASSETS, STUDIO_IMAGES } from '../data/initialCatalog';
 import { FadeScroll } from '../components/FadeScroll';
 import { SectionHeader } from '../components/SectionHeader';
 import { StudioImage } from '../components/StudioImage';
@@ -17,7 +17,6 @@ import { PortfolioModal } from '../components/PortfolioModal';
 import {
   DIGITAL_PRODUCT_CATEGORY_LABELS,
   filterDigitalProducts,
-  formatRupiah,
   SERVICE_CATEGORY_LABELS,
 } from '../utils/studioLogic';
 import {
@@ -120,11 +119,6 @@ export function HomePage() {
     [design.articles.items]
   );
 
-  const lowestServicePrice =
-    services.length > 0
-      ? formatRupiah(Math.min(...services.map((s) => s.priceMin)))
-      : '—';
-
   const heroImageUrl =
     design.identity.heroImageOverrideUrl || siteSettings.heroImageUrl || STUDIO_IMAGES.hero;
   const heroDriveFileId =
@@ -154,8 +148,94 @@ export function HomePage() {
       case 'hero': {
         const heroLayout = cfg.heroLayout || 'split_right';
         const isDesktop = viewport === 'desktop';
+        const isTablet = viewport === 'tablet';
+        const isHorizontalSplit = isDesktop || isTablet;
         const headline = cfg.customTitle?.trim() || siteSettings.heroHeadline;
         const subheadline = cfg.customSubtitle?.trim() || siteSettings.heroSubheadline;
+
+        const renderSymbolStage = (mode: 'split' | 'centered') => {
+          const sizeClass =
+            mode === 'centered'
+              ? 'w-[190px] sm:w-[230px] lg:w-[260px]'
+              : isDesktop
+                ? 'w-[270px] xl:w-[310px]'
+                : isTablet
+                  ? 'w-[205px] md:w-[225px]'
+                  : 'w-[188px]';
+
+          return (
+            <div className="relative w-full h-full flex items-center justify-center overflow-hidden px-6 py-8 sm:px-7 sm:py-9 lg:px-9 lg:py-10 min-h-[225px] sm:min-h-[290px] lg:min-h-[340px]">
+              {/* Subtle ambient radial harmony */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(138,204,213,0.22)_0%,rgba(243,201,91,0.12)_44%,transparent_72%)]"
+              />
+
+              {/* Minimal architectural geometric accents echoing the O ring, swoosh & triangle */}
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 400 340"
+                fill="none"
+                preserveAspectRatio="xMidYMid meet"
+                className="pointer-events-none absolute inset-0 w-full h-full"
+              >
+                <circle
+                  cx="200"
+                  cy="170"
+                  r="136"
+                  stroke="#0F3D3A"
+                  strokeOpacity="0.12"
+                  strokeWidth="1.25"
+                  strokeDasharray="4 6"
+                />
+                <circle
+                  cx="200"
+                  cy="170"
+                  r="110"
+                  stroke="#0F3D3A"
+                  strokeOpacity="0.07"
+                  strokeWidth="1"
+                />
+                <rect
+                  x="26"
+                  y="24"
+                  width="12"
+                  height="12"
+                  rx="2"
+                  fill="#F3C95B"
+                  fillOpacity="0.88"
+                  stroke="#171717"
+                  strokeOpacity="0.25"
+                  strokeWidth="1"
+                />
+                <polygon
+                  points="356,312 368,291 380,312"
+                  fill="#0F3D3A"
+                  fillOpacity="0.14"
+                  stroke="#0F3D3A"
+                  strokeOpacity="0.28"
+                  strokeWidth="1"
+                />
+              </svg>
+
+              <FadeScroll
+                index={1}
+                staggerMs={110}
+                durationMs={700}
+                distancePx={22}
+                className="relative z-10 flex items-center justify-center w-full"
+              >
+                <img
+                  src={BRAND_ASSETS.symbolUrl}
+                  alt="Simbol logo OSAMA CREATIVE STUDIO"
+                  loading="eager"
+                  decoding="async"
+                  className={`${sizeClass} max-w-[86%] h-auto object-contain select-none drop-shadow-[0_14px_24px_rgba(15,61,58,0.12)]`}
+                />
+              </FadeScroll>
+            </div>
+          );
+        };
 
         if (heroLayout === 'banner_overlay') {
           return (
@@ -288,15 +368,8 @@ export function HomePage() {
                       </Link>
                     </div>
                   </div>
-                  <div className="w-full max-w-3xl border-2 border-[#171717] rounded-[6px] overflow-hidden">
-                    <StudioImage
-                      src={heroImageUrl}
-                      driveFileId={heroDriveFileId}
-                      cacheVersion={siteSettings.updatedAt}
-                      alt="Ilustrasi ruang kerja kreatif OSAMA CREATIVE STUDIO"
-                      aspectClass="w-full aspect-[16/9]"
-                      loading="eager"
-                    />
+                  <div className="w-full max-w-2xl border-2 border-[#171717] rounded-[6px] overflow-hidden bg-[#F8F8E1]">
+                    {renderSymbolStage('centered')}
                   </div>
                 </div>
               </div>
@@ -329,15 +402,15 @@ export function HomePage() {
 
               <div className="nb-card relative z-10 overflow-hidden bg-white">
                 <div
-                  className={`grid items-stretch ${isDesktop ? 'grid-cols-12' : 'grid-cols-1'}`}
+                  className={`grid items-stretch ${isHorizontalSplit ? 'grid-cols-12' : 'grid-cols-1'}`}
                 >
                   <FadeScroll
                     index={0}
                     durationMs={650}
                     distancePx={22}
-                    className={`${isDesktop ? 'col-span-7' : ''} ${
-                      isImageLeft && isDesktop ? 'order-2' : 'order-1'
-                    } p-5 sm:p-7 flex flex-col justify-center gap-3.5 ${alignClass}`}
+                    className={`${isHorizontalSplit ? 'col-span-7' : ''} ${
+                      isImageLeft && isHorizontalSplit ? 'order-2' : 'order-1'
+                    } ${isTablet ? 'p-5 sm:p-6' : 'p-5 sm:p-7'} flex flex-col justify-center gap-3.5 ${alignClass}`}
                   >
                     <p
                       className="text-xs font-semibold text-[#6C151E]"
@@ -347,7 +420,7 @@ export function HomePage() {
                     </p>
 
                     <h1
-                      className="font-display font-bold text-2xl sm:text-3xl lg:text-[2.1rem] text-[#171717] leading-[1.16]"
+                      className="font-display font-bold text-2xl sm:text-[1.625rem] lg:text-[2.1rem] text-[#171717] leading-[1.16]"
                       style={{
                         textWrap: 'balance',
                         ...(cfg.headingSizePx > 0 ? { fontSize: `${cfg.headingSizePx}px` } : {}),
@@ -400,38 +473,15 @@ export function HomePage() {
                   </FadeScroll>
 
                   <div
-                    className={`${isDesktop ? 'col-span-5' : ''} ${
-                      isImageLeft && isDesktop
+                    className={`${isHorizontalSplit ? 'col-span-5' : ''} ${
+                      isImageLeft && isHorizontalSplit
                         ? 'order-1 border-r-2'
-                        : isDesktop
+                        : isHorizontalSplit
                           ? 'order-2 border-l-2'
                           : 'order-2 border-t-2'
-                    } border-[#171717] bg-[#F8F8E1] flex flex-col overflow-hidden`}
+                    } border-[#171717] bg-[#F8F8E1] flex items-center justify-center overflow-hidden`}
                   >
-                    <div className="relative z-10 bg-[#0F3D3A] text-[#F8F8E1] px-4 py-2 border-b-2 border-[#171717] flex items-center justify-between gap-2 text-[11px] font-medium">
-                      <span className="truncate">Katalog Jasa &amp; Produk Digital</span>
-                      <span className="font-mono text-[#F3C95B] whitespace-nowrap shrink-0">
-                        Mulai {lowestServicePrice}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-h-0 flex overflow-hidden">
-                      <FadeScroll
-                        index={1}
-                        staggerMs={110}
-                        durationMs={700}
-                        distancePx={24}
-                        className="w-full h-full flex"
-                      >
-                        <StudioImage
-                          src={heroImageUrl}
-                          driveFileId={heroDriveFileId}
-                          cacheVersion={siteSettings.updatedAt}
-                          alt="Ilustrasi ruang kerja kreatif OSAMA CREATIVE STUDIO"
-                          aspectClass="w-full aspect-[16/10] lg:aspect-auto lg:h-full"
-                          loading="eager"
-                        />
-                      </FadeScroll>
-                    </div>
+                    {renderSymbolStage('split')}
                   </div>
                 </div>
               </div>

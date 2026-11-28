@@ -11,6 +11,7 @@ export const STUDIO_IMAGES = {
 
 export const BRAND_ASSETS = {
   logoUrl: '/assets/aistudio/Osama_Creative_Studio_Logo_e36884c7.png',
+  symbolUrl: '/assets/aistudio/osama-symbol.png',
   faviconUrl: '/assets/aistudio/osama-favicon.png',
 } as const;
 
